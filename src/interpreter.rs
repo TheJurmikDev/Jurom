@@ -10,13 +10,14 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
             Stmt::ClassDecl(_, body) => {
                 for class_stmt in body {
                     match class_stmt {
-                        Stmt::FunctionDecl(func_name, func_body) => {
-                            runtime.register_function(func_name.clone(), func_body.clone());
+                        Stmt::FunctionDecl(func_name, params, func_body) => {
+                            runtime.register_function(func_name.clone(), params.clone(), func_body.clone());
                             if func_name == "main" {
                                 main_body = func_body.clone();
                             }
                         }
-                        Stmt::VariableDecl(_type_name, var_name, expr) => {
+                        Stmt::VariableDecl(type_name, var_name, expr) => {
+                            runtime.check_type(expr, type_name)?;
                             let value = runtime.evaluate_expr(expr)?;
                             runtime.set_variable(var_name.clone(), value);
                         }
@@ -24,13 +25,14 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
                     }
                 }
             }
-            Stmt::FunctionDecl(func_name, func_body) => {
-                runtime.register_function(func_name.clone(), func_body.clone());
+            Stmt::FunctionDecl(func_name, params, func_body) => {
+                runtime.register_function(func_name.clone(), params.clone(), func_body.clone());
                 if func_name == "main" {
                     main_body = func_body.clone();
                 }
             }
-            Stmt::VariableDecl(_type_name, var_name, expr) => {
+            Stmt::VariableDecl(type_name, var_name, expr) => {
+                runtime.check_type(expr, type_name)?;
                 let value = runtime.evaluate_expr(expr)?;
                 runtime.set_variable(var_name.clone(), value);
             }
@@ -42,9 +44,14 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
         for stmt in &main_body {
             match stmt {
                 Stmt::Expr(Expr::FunctionCall(name, args)) => {
-                    runtime.call_function(name, args)?;
+                    let mut arg_values = Vec::new();
+                    for arg in args {
+                        arg_values.push(runtime.evaluate_expr(arg)?);
+                    }
+                    runtime.call_function(name, &arg_values)?;
                 }
-                Stmt::VariableDecl(_type_name, var_name, expr) => {
+                Stmt::VariableDecl(type_name, var_name, expr) => {
+                    runtime.check_type(expr, type_name)?;
                     let value = runtime.evaluate_expr(expr)?;
                     runtime.set_variable(var_name.clone(), value);
                 }
@@ -55,14 +62,24 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
                             for stmt in body {
                                 match stmt {
                                     Stmt::Expr(Expr::FunctionCall(name, args)) => {
-                                        runtime.call_function(name, args)?;
+                                        let mut arg_values = Vec::new();
+                                        for arg in args {
+                                            arg_values.push(runtime.evaluate_expr(arg)?);
+                                        }
+                                        runtime.call_function(name, &arg_values)?;
                                     }
-                                    Stmt::VariableDecl(_type_name, var_name, expr) => {
+                                    Stmt::VariableDecl(type_name, var_name, expr) => {
+                                        runtime.check_type(expr, type_name)?;
                                         let value = runtime.evaluate_expr(expr)?;
                                         runtime.set_variable(var_name.clone(), value);
                                     }
-                                    Stmt::If(_, _, _) => {
+                                    Stmt::If(_, _, _) | Stmt::While(_, _) | Stmt::For(_, _, _) => {
                                         execute(vec![stmt.clone()])?;
+                                    }
+                                    Stmt::Return(expr) => {
+                                        if let Some(value) = expr {
+                                            runtime.evaluate_expr(value)?;
+                                        }
                                     }
                                     _ => {}
                                 }
@@ -82,6 +99,78 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
                         }
                         _ => return Err("If condition must evaluate to a boolean".to_string()),
                     }
+                }
+                Stmt::While(condition, body) => {
+                    while runtime.evaluate_expr(condition)? == Value::Boolean(true) {
+                        for stmt in body {
+                            match stmt {
+                                Stmt::Expr(Expr::FunctionCall(name, args)) => {
+                                    let mut arg_values = Vec::new();
+                                    for arg in args {
+                                        arg_values.push(runtime.evaluate_expr(arg)?);
+                                    }
+                                    runtime.call_function(name, &arg_values)?;
+                                }
+                                Stmt::VariableDecl(type_name, var_name, expr) => {
+                                    runtime.check_type(expr, type_name)?;
+                                    let value = runtime.evaluate_expr(expr)?;
+                                    runtime.set_variable(var_name.clone(), value);
+                                }
+                                Stmt::If(_, _, _) | Stmt::While(_, _) | Stmt::For(_, _, _) => {
+                                    execute(vec![stmt.clone()])?;
+                                }
+                                Stmt::Return(expr) => {
+                                    if let Some(value) = expr {
+                                        runtime.evaluate_expr(value)?;
+                                    }
+                                    return Ok(());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                Stmt::For(var_name, array_expr, body) => {
+                    let array = runtime.evaluate_expr(array_expr)?;
+                    if let Value::Array(arr) = array {
+                        for value in arr {
+                            runtime.set_variable(var_name.clone(), value);
+                            for stmt in body {
+                                match stmt {
+                                    Stmt::Expr(Expr::FunctionCall(name, args)) => {
+                                        let mut arg_values = Vec::new();
+                                        for arg in args {
+                                            arg_values.push(runtime.evaluate_expr(arg)?);
+                                        }
+                                        runtime.call_function(name, &arg_values)?;
+                                    }
+                                    Stmt::VariableDecl(type_name, var_name, expr) => {
+                                        runtime.check_type(expr, type_name)?;
+                                        let value = runtime.evaluate_expr(expr)?;
+                                        runtime.set_variable(var_name.clone(), value);
+                                    }
+                                    Stmt::If(_, _, _) | Stmt::While(_, _) | Stmt::For(_, _, _) => {
+                                        execute(vec![stmt.clone()])?;
+                                    }
+                                    Stmt::Return(expr) => {
+                                        if let Some(value) = expr {
+                                            runtime.evaluate_expr(value)?;
+                                        }
+                                        return Ok(());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    } else {
+                        return Err("For loop requires an array expression".to_string());
+                    }
+                }
+                Stmt::Return(expr) => {
+                    if let Some(value) = expr {
+                        runtime.evaluate_expr(value)?;
+                    }
+                    return Ok(());
                 }
                 _ => {}
             }
