@@ -14,24 +14,11 @@ fn main() {
     }
 
     let path = Path::new(&args[1]);
-    let code = match fs::read_to_string(path) {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("Error reading file '{}': {}", path.display(), e);
-            std::process::exit(1);
-        }
-    };
+    let code = fs::read_to_string(path).expect("Can't read file");
 
-    let stmts = match parse_program(&code) {
-        Ok(stmts) => stmts,
-        Err(e) => {
-            eprintln!("Parsing error: {}", e);
-            std::process::exit(1);
-        }
-    };
-
+    let stmts = parse_program(&code).expect("Error while parsing");
     if let Err(e) = interpreter::execute(stmts) {
-        eprintln!("Execution error: {}", e);
+        eprintln!("Error while executing: {}", e);
         std::process::exit(1);
     }
 }
