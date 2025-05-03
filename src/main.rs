@@ -23,7 +23,7 @@ fn main() {
     match parse_program(&code) {
         Ok(stmts) => {
             if let Err(e) = interpreter::execute(stmts) {
-                eprintln!("{}: {}", "Execution error".red().bold(), e);
+                e.print(&code);
                 std::process::exit(0);
             }
         }

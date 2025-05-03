@@ -1,7 +1,7 @@
-use crate::parser::{Expr, Stmt};
-use crate::runtime::{Runtime};
+use crate::parser::{Expr, Stmt, ParseError};
+use crate::runtime::Runtime;
 
-pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
+pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
     let mut runtime = Runtime::new();
     let mut main_body = Vec::new();
 
@@ -41,8 +41,8 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
     if !main_body.is_empty() {
         for stmt in &main_body {
             match stmt {
-                Stmt::Expr(Expr::FunctionCall(name, args)) => {
-                    runtime.call_function(name, args)?;
+                Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                    runtime.call_function(name, args, *line, *column)?;
                 }
                 Stmt::VariableDecl(_type_name, var_name, expr) => {
                     let value = runtime.evaluate_expr(expr)?;
@@ -55,7 +55,7 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
             }
         }
     } else {
-        return Err("No main function found".to_string());
+        return Err(ParseError::new("No main function found".to_string(), 0, 0));
     }
 
     Ok(())

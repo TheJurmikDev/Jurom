@@ -1,4 +1,4 @@
-use crate::parser::{Expr, Literal, Stmt};
+use crate::parser::{Expr, Literal, Stmt, ParseError};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -33,17 +33,17 @@ impl Runtime {
         self.variables.get(name)
     }
 
-    pub fn evaluate_expr(&self, expr: &Expr) -> Result<Value, String> {
+    pub fn evaluate_expr(&self, expr: &Expr) -> Result<Value, ParseError> {
         match expr {
-            Expr::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
-            Expr::Literal(Literal::Number(n)) => Ok(Value::Number(*n)),
-            Expr::Literal(Literal::Boolean(b)) => Ok(Value::Boolean(*b)),
-            Expr::Variable(name) => {
+            Expr::Literal(Literal::String(s), _line, _column) => Ok(Value::String(s.clone())),
+            Expr::Literal(Literal::Number(n), _line, _column) => Ok(Value::Number(*n)),
+            Expr::Literal(Literal::Boolean(b), _line, _column) => Ok(Value::Boolean(*b)),
+            Expr::Variable(name, line, column) => {
                 self.get_variable(name)
                     .cloned()
-                    .ok_or_else(|| format!("Variable {} not found", name))
+                    .ok_or_else(|| ParseError::new(format!("Variable {} not found", name), *line, *column))
             }
-            Expr::BinaryOp(left, op, right) => {
+            Expr::BinaryOp(left, op, right, line, column) => {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
@@ -52,17 +52,17 @@ impl Runtime {
                         "*" => Ok(Value::Number(l * r)),
                         "/" => {
                             if r == 0.0 {
-                                Err("Division by zero".to_string())
+                                Err(ParseError::new("Division by zero".to_string(), *line, *column))
                             } else {
                                 Ok(Value::Number(l / r))
                             }
                         }
-                        _ => Err(format!("Unknown operator: {}", op)),
+                        _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
                     },
-                    _ => Err("Binary operations only supported for numbers".to_string()),
+                    _ => Err(ParseError::new("Binary operations only supported for numbers".to_string(), *line, *column)),
                 }
             }
-            Expr::Comparison(left, op, right) => {
+            Expr::Comparison(left, op, right, line, column) => {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
@@ -71,14 +71,14 @@ impl Runtime {
                             "==" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Equal),
                             "<" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Less),
                             ">" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Greater),
-                            _ => return Err(format!("Unknown comparison operator: {}", op)),
+                            _ => return Err(ParseError::new(format!("Unknown comparison operator: {}", op), *line, *column)),
                         };
                         Ok(Value::Boolean(result))
                     }
-                    _ => Err("Comparison operations only supported for numbers".to_string()),
+                    _ => Err(ParseError::new("Comparison operations only supported for numbers".to_string(), *line, *column)),
                 }
             }
-            Expr::FunctionCall(name, args) => {
+            Expr::FunctionCall { name, args, line, column } => {
                 if name == "println" {
                     if let Some(expr) = args.get(0) {
                         let value = self.evaluate_expr(expr)?;
@@ -92,16 +92,16 @@ impl Runtime {
                             Value::Boolean(b) => Ok(Value::String(b.to_string())),
                         }
                     } else {
-                        Err("No argument provided for println".to_string())
+                        Err(ParseError::new("No argument provided for println".to_string(), *line, *column))
                     }
                 } else {
-                    Err("Function calls not supported in expressions".to_string())
+                    Err(ParseError::new("Function calls not supported in expressions".to_string(), *line, *column))
                 }
             }
         }
     }
 
-    pub fn call_function(&mut self, name: &str, args: &[Expr]) -> Result<(), String> {
+    pub fn call_function(&mut self, name: &str, args: &[Expr], line: usize, column: usize) -> Result<(), ParseError> {
         if name == "println" {
             if let Some(expr) = args.get(0) {
                 let value = self.evaluate_expr(expr)?;
@@ -116,18 +116,18 @@ impl Runtime {
                 }
                 Ok(())
             } else {
-                Err("No argument provided for system.console.println".to_string())
+                Err(ParseError::new("No argument provided for system.console.println".to_string(), line, column))
             }
         } else {
             let body = self
                 .functions
                 .get(name)
                 .cloned()
-                .ok_or_else(|| format!("Invalid function: {}", name))?;
+                .ok_or_else(|| ParseError::new(format!("Invalid function: {}", name), line, column))?;
             for stmt in body {
                 match stmt {
-                    Stmt::Expr(Expr::FunctionCall(func_name, func_args)) => {
-                        self.call_function(&func_name, &func_args)?;
+                    Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                        self.call_function(&name, &args, line, column)?;
                     }
                     Stmt::VariableDecl(_type_name, var_name, expr) => {
                         let value = self.evaluate_expr(&expr)?;
@@ -148,14 +148,14 @@ impl Runtime {
         condition: &Expr,
         body: &[Stmt],
         else_branch: &Option<Box<Stmt>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), ParseError> {
         let condition_value = self.evaluate_expr(condition)?;
         match condition_value {
             Value::Boolean(true) => {
                 for stmt in body {
                     match stmt {
-                        Stmt::Expr(Expr::FunctionCall(name, args)) => {
-                            self.call_function(name, args)?;
+                        Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                            self.call_function(name, args, *line, *column)?;
                         }
                         Stmt::VariableDecl(_type_name, var_name, expr) => {
                             let value = self.evaluate_expr(expr)?;
@@ -174,8 +174,8 @@ impl Runtime {
                         Stmt::Block(stmts) => {
                             for stmt in stmts {
                                 match stmt {
-                                    Stmt::Expr(Expr::FunctionCall(name, args)) => {
-                                        self.call_function(name, args)?;
+                                    Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                                        self.call_function(name, args, *line, *column)?;
                                     }
                                     Stmt::VariableDecl(_type_name, var_name, expr) => {
                                         let value = self.evaluate_expr(expr)?;
@@ -188,11 +188,11 @@ impl Runtime {
                                 }
                             }
                         }
-                        _ => return Err("Invalid else branch".to_string()),
+                        _ => return Err(ParseError::new("Invalid else branch".to_string(), 0, 0)),
                     }
                 }
             }
-            _ => return Err("If condition must evaluate to a boolean".to_string()),
+            _ => return Err(ParseError::new("If condition must evaluate to a boolean".to_string(), 0, 0)),
         }
         Ok(())
     }
