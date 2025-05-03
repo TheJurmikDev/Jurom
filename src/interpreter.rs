@@ -81,8 +81,13 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                     let value = runtime.evaluate_expr(expr)?;
                     runtime.set_variable(var_name.clone(), value);
                 }
-                Stmt::If(condition, body, else_branch) => {
-                    runtime.execute_if(condition, body, else_branch)?;
+                Stmt::If {
+                    condition,
+                    body,
+                    else_if,
+                    else_branch,
+                } => {
+                    runtime.execute_if(condition, body, else_if, else_branch)?;
                 }
                 _ => {}
             }

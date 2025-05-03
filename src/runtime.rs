@@ -258,8 +258,13 @@ impl Runtime {
                         let value = self.evaluate_expr(&expr)?;
                         self.set_variable(var_name, value);
                     }
-                    Stmt::If(condition, body, else_branch) => {
-                        self.execute_if(&condition, &*body, &else_branch)?;
+                    Stmt::If {
+                        condition,
+                        body,
+                        else_if,
+                        else_branch,
+                    } => {
+                        self.execute_if(&condition, &body, &else_if, &else_branch)?;
                     }
                     _ => {}
                 }
@@ -268,43 +273,87 @@ impl Runtime {
         }
     }
 
-    pub(crate) fn execute_if(
+    pub fn execute_if(
         &mut self,
         condition: &Expr,
         body: &[Stmt],
+        else_if_branches: &[(Expr, Vec<Stmt>)],
         else_branch: &Option<Box<Stmt>>,
     ) -> Result<(), ParseError> {
         let condition_value = self.evaluate_expr(condition)?;
-        match condition_value {
-            Value::Boolean(true) => {
-                for stmt in body {
-                    match stmt {
-                        Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
-                            self.call_function(name, args, *line, *column)?;
-                        }
-                        Stmt::VariableDecl(_type_name, var_name, expr) => {
-                            let value = self.evaluate_expr(expr)?;
-                            self.set_variable(var_name.clone(), value);
-                        }
-                        Stmt::Assignment(var_name, expr) => {
-                            if self.get_variable(&var_name).is_none() {
-                                return Err(ParseError::new(
-                                    format!("Variable {} not found", var_name),
-                                    condition.get_line(),
-                                    condition.get_column(),
-                                ));
-                            }
-                            let value = self.evaluate_expr(&expr)?;
-                            self.set_variable(var_name.clone(), value);
-                        }
-                        Stmt::If(condition, body, else_branch) => {
-                            self.execute_if(condition, body, else_branch)?;
-                        }
-                        _ => {}
+        if let Value::Boolean(true) = condition_value {
+            for stmt in body {
+                match stmt {
+                    Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                        self.call_function(name, args, *line, *column)?;
                     }
+                    Stmt::VariableDecl(_type_name, var_name, expr) => {
+                        let value = self.evaluate_expr(expr)?;
+                        self.set_variable(var_name.clone(), value);
+                    }
+                    Stmt::Assignment(var_name, expr) => {
+                        if self.get_variable(var_name).is_none() {
+                            return Err(ParseError::new(
+                                format!("Variable {} not found", var_name),
+                                condition.get_line(),
+                                condition.get_column(),
+                            ));
+                        }
+                        let value = self.evaluate_expr(expr)?;
+                        self.set_variable(var_name.clone(), value);
+                    }
+                    Stmt::If {
+                        condition,
+                        body,
+                        else_if,
+                        else_branch,
+                    } => {
+                        self.execute_if(condition, body, else_if, else_branch)?;
+                    }
+                    _ => {}
                 }
             }
-            Value::Boolean(false) => {
+        } else {
+            let mut executed = false;
+            for (else_if_condition, else_if_body) in else_if_branches {
+                let else_if_value = self.evaluate_expr(else_if_condition)?;
+                if let Value::Boolean(true) = else_if_value {
+                    for stmt in else_if_body {
+                        match stmt {
+                            Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                                self.call_function(name, args, *line, *column)?;
+                            }
+                            Stmt::VariableDecl(_type_name, var_name, expr) => {
+                                let value = self.evaluate_expr(expr)?;
+                                self.set_variable(var_name.clone(), value);
+                            }
+                            Stmt::Assignment(var_name, expr) => {
+                                if self.get_variable(var_name).is_none() {
+                                    return Err(ParseError::new(
+                                        format!("Variable {} not found", var_name),
+                                        else_if_condition.get_line(),
+                                        else_if_condition.get_column(),
+                                    ));
+                                }
+                                let value = self.evaluate_expr(expr)?;
+                                self.set_variable(var_name.clone(), value);
+                            }
+                            Stmt::If {
+                                condition,
+                                body,
+                                else_if,
+                                else_branch,
+                            } => {
+                                self.execute_if(condition, body, else_if, else_branch)?;
+                            }
+                            _ => {}
+                        }
+                    }
+                    executed = true;
+                    break;
+                }
+            }
+            if !executed {
                 if let Some(else_stmt) = else_branch {
                     match &**else_stmt {
                         Stmt::Block(stmts) => {
@@ -318,28 +367,32 @@ impl Runtime {
                                         self.set_variable(var_name.clone(), value);
                                     }
                                     Stmt::Assignment(var_name, expr) => {
-                                        if self.get_variable(&var_name).is_none() {
+                                        if self.get_variable(var_name).is_none() {
                                             return Err(ParseError::new(
                                                 format!("Variable {} not found", var_name),
                                                 condition.get_line(),
                                                 condition.get_column(),
                                             ));
                                         }
-                                        let value = self.evaluate_expr(&expr)?;
+                                        let value = self.evaluate_expr(expr)?;
                                         self.set_variable(var_name.clone(), value);
                                     }
-                                    Stmt::If(condition, body, else_branch) => {
-                                        self.execute_if(condition, body, else_branch)?;
+                                    Stmt::If {
+                                        condition,
+                                        body,
+                                        else_if,
+                                        else_branch,
+                                    } => {
+                                        self.execute_if(condition, body, else_if, else_branch)?;
                                     }
                                     _ => {}
                                 }
                             }
                         }
-                        _ => return Err(ParseError::new("Invalid else branch".to_string(), 0, 0)),
+                        _ => return Err(ParseError::new("Invalid else branch".to_string(), condition.get_line(), condition.get_column())),
                     }
                 }
             }
-            _ => return Err(ParseError::new("If condition must evaluate to a boolean".to_string(), 0, 0)),
         }
         Ok(())
     }

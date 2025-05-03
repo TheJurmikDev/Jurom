@@ -7,7 +7,7 @@ use nom::{
     sequence::delimited,
     character::complete::{alphanumeric1, multispace0, one_of},
     branch::alt,
-    combinator::map,
+    combinator::{map, opt},
     sequence::tuple,
     number::complete::double,
     error::{context, Error, ErrorKind},
@@ -37,7 +37,12 @@ pub enum Stmt {
     Assignment(String, Expr),
     Expr(Expr),
     FunctionCall(String),
-    If(Expr, Vec<Stmt>, Option<Box<Stmt>>),
+    If {
+        condition: Expr,
+        body: Vec<Stmt>,
+        else_if: Vec<(Expr, Vec<Stmt>)>,
+        else_branch: Option<Box<Stmt>>,
+    },
     Block(Vec<Stmt>),
 }
 
@@ -148,17 +153,25 @@ fn parse_binary_op(input: &str, line: usize, column: usize) -> IResult<&str, Exp
 }
 
 fn parse_comparison(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    println!("Parsing comparison: '{}'", input);
     context(
         "comparison operation",
         map(
             tuple((
-                |i| parse_operand(i, line, column),
+                |i| {
+                    println!("Parsing left operand: '{}'", i);
+                    parse_operand(i, line, column)
+                },
                 multispace0,
                 alt((tag("=="), tag("<"), tag(">"))),
                 multispace0,
-                |i| parse_operand(i, line, column),
+                |i| {
+                    println!("Parsing right operand: '{}'", i);
+                    parse_operand(i, line, column)
+                },
             )),
             |(left, _, op, _, right)| {
+                println!("Parsed comparison: {:?} {} {:?}", left, op, right);
                 Expr::Comparison(Box::new(left), op.to_string(), Box::new(right), line, column)
             },
         ),
@@ -202,12 +215,16 @@ fn parse_expression(input: &str, line: usize, column: usize) -> IResult<&str, Ex
 }
 
 fn parse_println(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    println!("Parsing println: '{}'", input);
     context(
         "println",
         map(
             tuple((
                 tag("system.console.println("),
-                |i| parse_expression(i, line, column),
+                |i| {
+                    println!("Parsing println expression: '{}'", i);
+                    parse_expression(i, line, column)
+                },
                 tag(")"),
                 nom::combinator::opt(tag(";")),
             )),
@@ -276,35 +293,55 @@ fn parse_function_call(input: &str, line: usize, column: usize) -> IResult<&str,
     )(input)
 }
 
-#[allow(dead_code)]
-fn parse_block(input: &str, line: usize, column: usize) -> IResult<&str, Vec<Stmt>> {
+fn parse_block(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
+    println!("Parsing block start: '{}'", input);
     context(
         "block",
-        delimited(
+        map(
             tuple((multispace0, tag("{"), multispace0)),
-            nom::multi::many0(|i| parse_line(i, line, column)),
-            tuple((multispace0, tag("}"), multispace0)),
+            |_| (),
         ),
     )(input)
 }
 
-fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, (Expr, Vec<Stmt>)> {
+fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    println!("Parsing if: '{}'", input);
     context(
         "if statement",
         map(
             tuple((
                 tag("if"),
                 multispace0,
-                |i| parse_condition_in_parens(i, line, column),
+                |i| {
+                    println!("Parsing condition: '{}'", i);
+                    parse_condition_in_parens(i, line, column)
+                },
                 multispace0,
-                tag("{"),
+                |i| parse_block(i, line, column),
             )),
-            |(_, _, condition, _, _)| (condition, vec![]),
+            |(_, _, condition, _, _)| condition,
         ),
     )(input)
 }
 
-fn parse_line(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
+fn parse_else_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    println!("Parsing else if: '{}'", input);
+    context(
+        "else if statement",
+        map(
+            tuple((
+                tag("else if"),
+                multispace0,
+                |i| parse_condition_in_parens(i, line, column),
+                multispace0,
+                |i| parse_block(i, line, column),
+            )),
+            |(_, _, condition, _, _)| condition,
+        ),
+    )(input)
+}
+
+fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str, (Stmt, Option<(String, Expr)>)> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Err(nom::Err::Error(Error {
@@ -312,20 +349,66 @@ fn parse_line(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
             code: ErrorKind::Fail,
         }));
     }
+    println!("Parsing line: '{}'", trimmed);
     context(
         "line",
         alt((
-            map(|i| parse_if(i, line, column), |(condition, body)| {
-                Stmt::If(condition, body, None)
-            }),
-            |i| parse_variable_decl(i, line, column),
-            |i| parse_assignment(i, line, column),
-            map(|i| parse_println(i, line, column), Stmt::Expr),
-            map(|i| parse_function_call(i, line, column), Stmt::Expr),
-            map(tag("}"), |_| {
-                Stmt::Expr(Expr::Literal(Literal::String("END_BLOCK".to_string()), line, column))
-            }),
-            map(tag("main();"), |_| Stmt::FunctionCall("main".to_string())),
+            map(
+                tuple((
+                    |i| parse_if(i, line, column),
+                    opt(|i: &'a str| {
+                        let (rest, _) = multispace0(i)?;
+                        println!("Checking for else after if: '{}'", rest);
+                        alt((
+                            map(
+                                |i| parse_else_if(i, line, column),
+                                |cond| ("else if".to_string(), cond),
+                            ),
+                            map(
+                                tag("else {"),
+                                |_| ("else".to_string(), Expr::Literal(Literal::Boolean(true), line, column)),
+                            ),
+                        ))(rest)
+                    }),
+                )),
+                |(condition, else_part)| (
+                    Stmt::If {
+                        condition,
+                        body: vec![],
+                        else_if: vec![],
+                        else_branch: None,
+                    },
+                    else_part,
+                ),
+            ),
+            map(|i| parse_variable_decl(i, line, column), |stmt| (stmt, None)),
+            map(|i| parse_assignment(i, line, column), |stmt| (stmt, None)),
+            map(|i| parse_println(i, line, column), |expr| (Stmt::Expr(expr), None)),
+            map(|i| parse_function_call(i, line, column), |expr| (Stmt::Expr(expr), None)),
+            map(
+                tuple((
+                    tag("}"),
+                    opt(|i: &'a str| {
+                        let (rest, _) = multispace0(i)?;
+                        println!("Checking for else after }}: '{}'", rest);
+                        alt((
+                            map(
+                                |i| parse_else_if(i, line, column),
+                                |cond| ("else if".to_string(), cond),
+                            ),
+                            map(
+                                tag("else {"),
+                                |_| ("else".to_string(), Expr::Literal(Literal::Boolean(true), line, column)),
+                            ),
+                        ))(rest)
+                    }),
+                )),
+                |(_, else_part)| (
+                    Stmt::Expr(Expr::Literal(Literal::String("END_BLOCK".to_string()), line, column)),
+                    else_part,
+                ),
+            ),
+            map(tag("main();"), |_| (Stmt::FunctionCall("main".to_string()), None)),
         )),
     )(trimmed)
 }
@@ -335,17 +418,23 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut current_class: Option<String> = None;
     let mut current_function: Option<String> = None;
     let mut current_if: Option<(Expr, Vec<Stmt>)> = None;
+    let mut else_if_branches: Vec<(Expr, Vec<Stmt>)> = Vec::new();
     let mut class_body: Vec<Stmt> = Vec::new();
     let mut function_body: Vec<Stmt> = Vec::new();
-    let mut if_body: Vec<Stmt> = Vec::new();
     let mut else_body: Vec<Stmt> = Vec::new();
     let mut in_else = false;
+    let mut block_body: Vec<Stmt> = Vec::new();
+    let mut block_depth = 0;
     let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new();
 
     let lines: Vec<&str> = code.lines().collect();
-    for (line_num, line) in lines.iter().enumerate() {
+    let mut line_index = 0;
+
+    while line_index < lines.len() {
+        let line = lines[line_index];
         let trimmed = line.trim();
         if trimmed.is_empty() {
+            line_index += 1;
             continue;
         }
 
@@ -360,13 +449,15 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             if current_class.is_some() {
                 return Err(ParseError::new(
                     "Nested classes are not supported".to_string(),
-                    line_num + 1,
+                    line_index + 1,
                     column,
                 ));
             }
             current_class = Some(class_name);
             class_body = Vec::new();
             declared_variables.clear();
+            block_depth += 1;
+            line_index += 1;
             continue;
         } else if trimmed.starts_with("function") {
             let func_name = trimmed
@@ -377,66 +468,26 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             if current_function.is_some() {
                 return Err(ParseError::new(
                     "Nested functions are not supported".to_string(),
-                    line_num + 1,
+                    line_index + 1,
                     column,
                 ));
             }
             current_function = Some(func_name);
             function_body = Vec::new();
             declared_variables.clear();
-            continue;
-        } else if trimmed == "} else {" {
-            if in_else {
-                if let Some((condition, if_body)) = current_if.take() {
-                    let else_stmt = Some(Box::new(Stmt::Block(else_body.clone())));
-                    if current_function.is_some() {
-                        function_body.push(Stmt::If(condition.clone(), if_body, else_stmt));
-                    } else if current_class.is_some() {
-                        class_body.push(Stmt::If(condition.clone(), if_body, else_stmt));
-                    } else {
-                        stmts.push(Stmt::If(condition.clone(), if_body, else_stmt));
-                    }
-                    current_if = Some((condition, vec![]));
-                }
-                else_body.clear();
-            } else if let Some((condition, mut body)) = current_if.take() {
-                body.append(&mut if_body);
-                let else_stmt = if else_body.is_empty() {
-                    None
-                } else {
-                    Some(Box::new(Stmt::Block(else_body.clone())))
-                };
-                if current_function.is_some() {
-                    function_body.push(Stmt::If(condition.clone(), body, else_stmt));
-                } else if current_class.is_some() {
-                    class_body.push(Stmt::If(condition.clone(), body, else_stmt));
-                } else {
-                    stmts.push(Stmt::If(condition.clone(), body, else_stmt));
-                }
-                current_if = Some((condition, vec![]));
-                if_body.clear();
-                else_body.clear();
-            }
-            in_else = true;
-            else_body = Vec::new();
-            continue;
-        } else if trimmed == "else {" {
-            if current_if.is_none() {
-                return Err(ParseError::new(
-                    "Else without matching if".to_string(),
-                    line_num + 1,
-                    column,
-                ));
-            }
-            in_else = true;
-            else_body = Vec::new();
+            block_depth += 1;
+            line_index += 1;
             continue;
         }
 
-        let (rest, stmt) = parse_line(trimmed, line_num + 1, column).map_err(|e| {
+        let (rest, (stmt, else_part)) = parse_line(trimmed, line_index + 1, column).map_err(|e| {
             let message = match &e {
                 nom::Err::Error(err) | nom::Err::Failure(err) => {
-                    if err.code == ErrorKind::Tag && trimmed.contains("=") && !trimmed.ends_with(";") {
+                    if trimmed.starts_with("if ") {
+                        format!("Failed to parse if statement: unexpected '{}'", err.input)
+                    } else if trimmed.starts_with("else ") {
+                        format!("Failed to parse else statement: unexpected '{}'", err.input)
+                    } else if err.code == ErrorKind::Tag && trimmed.contains("=") && !trimmed.ends_with(";") {
                         "Missing semicolon".to_string()
                     } else {
                         format!("Invalid syntax: unexpected '{}'", err.input)
@@ -449,95 +500,148 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 nom::Err::Incomplete(_) => trimmed,
             };
             let error_column = column + (trimmed.len() - error_input.len());
-            ParseError::new(message, line_num + 1, error_column)
+            ParseError::new(message, line_index + 1, error_column)
         })?;
 
         if !rest.is_empty() {
             return Err(ParseError::new(
                 format!("Unexpected tokens: {}", rest),
-                line_num + 1,
+                line_index + 1,
                 column + (trimmed.len() - rest.len()),
             ));
         }
 
+        println!("Parsed stmt: {:?}", stmt);
+        println!("Else part: {:?}", else_part);
+        println!("Current if: {:?}", current_if);
+
+        // Handle else_part first to maintain if context
+        if let Some((ref else_type, ref condition)) = else_part {
+            if current_if.is_none() {
+                return Err(ParseError::new(
+                    format!("{} without matching if", else_type),
+                    line_index + 1,
+                    column,
+                ));
+            }
+            if else_type == "else if" {
+                else_if_branches.push((condition.clone(), Vec::new()));
+                block_depth += 1;
+                println!("Added else_if branch: {:?}", condition);
+            } else if else_type == "else" {
+                in_else = true;
+                else_body = Vec::new();
+                block_depth += 1;
+                println!("Started else branch");
+            }
+        }
+
         match &stmt {
             Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK" => {
+                block_depth -= 1;
+                println!("Processing END_BLOCK, block_depth: {}", block_depth);
                 if in_else {
                     if let Some((condition, if_body)) = current_if.take() {
-                        let else_stmt = Some(Box::new(Stmt::Block(else_body.clone())));
-                        if current_function.is_some() {
-                            function_body.push(Stmt::If(condition, if_body, else_stmt));
-                        } else if current_class.is_some() {
-                            class_body.push(Stmt::If(condition, if_body, else_stmt));
+                        let else_stmt = if else_body.is_empty() {
+                            None
                         } else {
-                            stmts.push(Stmt::If(condition, if_body, else_stmt));
+                            Some(Box::new(Stmt::Block(else_body)))
+                        };
+                        let if_stmt = Stmt::If {
+                            condition,
+                            body: if_body,
+                            else_if: else_if_branches,
+                            else_branch: else_stmt,
+                        };
+                        if current_function.is_some() {
+                            function_body.push(if_stmt);
+                        } else if current_class.is_some() {
+                            class_body.push(if_stmt);
+                        } else {
+                            stmts.push(if_stmt);
                         }
                     }
                     in_else = false;
-                    else_body.clear();
-                } else if let Some((condition, mut body)) = current_if.take() {
-                    body.append(&mut if_body);
-                    let else_stmt = if else_body.is_empty() {
-                        None
-                    } else {
-                        Some(Box::new(Stmt::Block(else_body.clone())))
-                    };
-                    if current_function.is_some() {
-                        function_body.push(Stmt::If(condition, body, else_stmt));
-                    } else if current_class.is_some() {
-                        class_body.push(Stmt::If(condition, body, else_stmt));
-                    } else {
-                        stmts.push(Stmt::If(condition, body, else_stmt));
+                    else_body = Vec::new();
+                    else_if_branches = Vec::new();
+                } else if current_if.is_some() && else_part.is_none() {
+                    // Only finalize if there is no else_if or else following
+                    if let Some((condition, if_body)) = current_if.take() {
+                        let else_stmt = if else_body.is_empty() {
+                            None
+                        } else {
+                            Some(Box::new(Stmt::Block(else_body)))
+                        };
+                        let if_stmt = Stmt::If {
+                            condition,
+                            body: if_body,
+                            else_if: else_if_branches,
+                            else_branch: else_stmt,
+                        };
+                        if current_function.is_some() {
+                            function_body.push(if_stmt);
+                        } else if current_class.is_some() {
+                            class_body.push(if_stmt);
+                        } else {
+                            stmts.push(if_stmt);
+                        }
+                        else_if_branches = Vec::new();
+                        else_body = Vec::new();
                     }
-                    if_body.clear();
-                    else_body.clear();
                 } else if let Some(func_name) = current_function.take() {
-                    class_body.push(Stmt::FunctionDecl(func_name, function_body.clone()));
-                    function_body.clear();
+                    class_body.push(Stmt::FunctionDecl(func_name, function_body));
+                    function_body = Vec::new();
                 } else if let Some(class_name) = current_class.take() {
-                    stmts.push(Stmt::ClassDecl(class_name, class_body.clone()));
-                    class_body.clear();
+                    stmts.push(Stmt::ClassDecl(class_name, class_body));
+                    class_body = Vec::new();
                 }
             }
-            Stmt::If(condition, _, _) => {
+            Stmt::If { condition, .. } => {
                 if current_if.is_some() {
                     return Err(ParseError::new(
                         "Nested if statements are not supported".to_string(),
-                        line_num + 1,
+                        line_index + 1,
                         column,
                     ));
                 }
-                current_if = Some((condition.clone(), vec![]));
-                if_body = Vec::new();
+                current_if = Some((condition.clone(), block_body.clone()));
+                block_body = Vec::new();
+                block_depth += 1;
+                println!("Started if with condition: {:?}", condition);
             }
             Stmt::VariableDecl(_type_name, var_name, _) => {
                 if declared_variables.contains_key(var_name) {
                     return Err(ParseError::new(
                         format!("Variable {} already declared", var_name),
-                        line_num + 1,
+                        line_index + 1,
                         column,
                     ));
                 }
-                declared_variables.insert(var_name.clone(), (line_num + 1, column));
+                declared_variables.insert(var_name.clone(), (line_index + 1, column));
             }
             _ => {}
         }
 
-        match &stmt {
-            _ => {
-                if in_else {
-                    else_body.push(stmt.clone());
-                } else if current_if.is_some() {
-                    if_body.push(stmt.clone());
-                } else if current_function.is_some() {
-                    function_body.push(stmt.clone());
-                } else if current_class.is_some() {
-                    class_body.push(stmt.clone());
-                } else {
-                    stmts.push(stmt.clone());
+        // Přidáváme stmt do těla pouze pokud není END_BLOCK
+        if !matches!(&stmt, Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK") {
+            if in_else {
+                else_body.push(stmt.clone());
+            } else if !else_if_branches.is_empty() {
+                if let Some(last) = else_if_branches.last_mut() {
+                    last.1.push(stmt.clone());
                 }
+            } else if current_if.is_some() {
+                block_body.push(stmt.clone());
+            } else if current_function.is_some() {
+                function_body.push(stmt);
+            } else if current_class.is_some() {
+                class_body.push(stmt);
+            } else {
+                stmts.push(stmt);
             }
         }
+
+        line_index += 1;
     }
 
     if current_if.is_some() {
@@ -550,6 +654,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     if current_function.is_some() || current_class.is_some() {
         return Err(ParseError::new(
             "Unclosed class or function block".to_string(),
+            lines.len(),
+            1,
+        ));
+    }
+    if block_depth != 0 {
+        return Err(ParseError::new(
+            "Unclosed block".to_string(),
             lines.len(),
             1,
         ));
