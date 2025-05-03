@@ -1,6 +1,6 @@
 # TODO
 - fix main function must be first
-- add else if
+- fix else if
 
 # ALL THINGS
 - public class
