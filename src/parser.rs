@@ -59,6 +59,7 @@ impl ParseError {
 
         let translated_message = match self.message.as_str() {
             "Missing semicolon" => "Chybí středník za deklarací proměnné".to_string(),
+            "Division by zero" => "Dělení nulou".to_string(),
             msg if msg.starts_with("Invalid syntax: unexpected") => {
                 format!("Neplatná syntaxe: neočekávaný token '{}'", msg.split("'").nth(1).unwrap_or(""))
             }

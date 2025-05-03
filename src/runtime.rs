@@ -1,10 +1,16 @@
 use crate::parser::{Expr, Literal, Stmt, ParseError};
 use std::collections::HashMap;
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Number {
+    Integer(i64),
+    Float(f64),
+}
+
 #[derive(Clone, Debug)]
 pub enum Value {
     String(String),
-    Number(f64),
+    Number(Number),
     Boolean(bool),
 }
 
@@ -36,7 +42,14 @@ impl Runtime {
     pub fn evaluate_expr(&self, expr: &Expr) -> Result<Value, ParseError> {
         match expr {
             Expr::Literal(Literal::String(s), _line, _column) => Ok(Value::String(s.clone())),
-            Expr::Literal(Literal::Number(n), _line, _column) => Ok(Value::Number(*n)),
+            Expr::Literal(Literal::Number(n), _line, _column) => {
+                // Pokud je číslo celé, uložíme jako Integer, jinak jako Float
+                if n.fract() == 0.0 && *n >= (i64::MIN as f64) && *n <= (i64::MAX as f64) {
+                    Ok(Value::Number(Number::Integer(*n as i64)))
+                } else {
+                    Ok(Value::Number(Number::Float(*n)))
+                }
+            }
             Expr::Literal(Literal::Boolean(b), _line, _column) => Ok(Value::Boolean(*b)),
             Expr::Variable(name, line, column) => {
                 self.get_variable(name)
@@ -47,17 +60,61 @@ impl Runtime {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
-                    (Value::Number(l), Value::Number(r)) => match op.as_str() {
-                        "+" => Ok(Value::Number(l + r)),
-                        "*" => Ok(Value::Number(l * r)),
-                        "/" => {
-                            if r == 0.0 {
-                                Err(ParseError::new("Division by zero".to_string(), *line, *column))
-                            } else {
-                                Ok(Value::Number(l / r))
+                    (Value::Number(left_num), Value::Number(right_num)) => match (left_num, right_num) {
+                        (Number::Integer(l), Number::Integer(r)) => match op.as_str() {
+                            "+" => Ok(Value::Number(Number::Integer(l + r))),
+                            "*" => Ok(Value::Number(Number::Integer(l * r))),
+                            "/" => {
+                                if r == 0 {
+                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                } else {
+                                    // Pokud je výsledek celé číslo, vrátíme Integer
+                                    let result = l / r;
+                                    if result >= i64::MIN && result <= i64::MAX && result % 1 == 0 {
+                                        Ok(Value::Number(Number::Integer(result)))
+                                    } else {
+                                        Ok(Value::Number(Number::Float(l as f64 / r as f64)))
+                                    }
+                                }
                             }
-                        }
-                        _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                        },
+                        (Number::Float(l), Number::Float(r)) => match op.as_str() {
+                            "+" => Ok(Value::Number(Number::Float(l + r))),
+                            "*" => Ok(Value::Number(Number::Float(l * r))),
+                            "/" => {
+                                if r == 0.0 {
+                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                } else {
+                                    Ok(Value::Number(Number::Float(l / r)))
+                                }
+                            }
+                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                        },
+                        (Number::Integer(l), Number::Float(r)) => match op.as_str() {
+                            "+" => Ok(Value::Number(Number::Float(l as f64 + r))),
+                            "*" => Ok(Value::Number(Number::Float(l as f64 * r))),
+                            "/" => {
+                                if r == 0.0 {
+                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                } else {
+                                    Ok(Value::Number(Number::Float(l as f64 / r)))
+                                }
+                            }
+                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                        },
+                        (Number::Float(l), Number::Integer(r)) => match op.as_str() {
+                            "+" => Ok(Value::Number(Number::Float(l + r as f64))),
+                            "*" => Ok(Value::Number(Number::Float(l * r as f64))),
+                            "/" => {
+                                if r == 0 {
+                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                } else {
+                                    Ok(Value::Number(Number::Float(l / r as f64)))
+                                }
+                            }
+                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                        },
                     },
                     _ => Err(ParseError::new("Binary operations only supported for numbers".to_string(), *line, *column)),
                 }
@@ -66,16 +123,74 @@ impl Runtime {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
-                    (Value::Number(l), Value::Number(r)) => {
-                        let result = match op.as_str() {
-                            "==" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Equal),
-                            "<" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Less),
-                            ">" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Greater),
-                            _ => return Err(ParseError::new(format!("Unknown comparison operator: {}", op), *line, *column)),
+                    (Value::Number(left_num), Value::Number(right_num)) => {
+                        let result = match (left_num, right_num) {
+                            (Number::Integer(l), Number::Integer(r)) => match op.as_str() {
+                                "==" => l == r,
+                                "<" => l < r,
+                                ">" => l > r,
+                                _ => {
+                                    return Err(ParseError::new(
+                                        format!("Unknown comparison operator: {}", op),
+                                        *line,
+                                        *column,
+                                    ))
+                                }
+                            },
+                            (Number::Float(l), Number::Float(r)) => {
+                                // Použijeme toleranci pro porovnání f64
+                                const EPSILON: f64 = 1e-10;
+                                match op.as_str() {
+                                    "==" => (l - r).abs() < EPSILON,
+                                    "<" => l < r - EPSILON,
+                                    ">" => l > r + EPSILON,
+                                    _ => {
+                                        return Err(ParseError::new(
+                                            format!("Unknown comparison operator: {}", op),
+                                            *line,
+                                            *column,
+                                        ))
+                                    }
+                                }
+                            }
+                            (Number::Integer(l), Number::Float(r)) => {
+                                const EPSILON: f64 = 1e-10;
+                                match op.as_str() {
+                                    "==" => ((l as f64) - r).abs() < EPSILON,
+                                    "<" => (l as f64) < r - EPSILON,
+                                    ">" => (l as f64) > r + EPSILON,
+                                    _ => {
+                                        return Err(ParseError::new(
+                                            format!("Unknown comparison operator: {}", op),
+                                            *line,
+                                            *column,
+                                        ))
+                                    }
+                                }
+                            }
+                            (Number::Float(l), Number::Integer(r)) => {
+                                const EPSILON: f64 = 1e-10;
+                                match op.as_str() {
+                                    "==" => (l - (r as f64)).abs() < EPSILON,
+                                    "<" => l < (r as f64) - EPSILON,
+                                    ">" => l > (r as f64) + EPSILON,
+                                    _ => {
+                                        return Err(ParseError::new(
+                                            format!("Unknown comparison operator: {}", op),
+                                            *line,
+                                            *column,
+                                        ))
+                                    }
+                                }
+                            }
                         };
                         Ok(Value::Boolean(result))
                     }
-                    _ => Err(ParseError::new("Comparison operations only supported for numbers".to_string(), *line, *column)),
+                    _ => Err(ParseError::new(
+                        "Comparison operations only supported for numbers".to_string(),
+                        *line,
+                        *column,
+                    )),
                 }
             }
             Expr::FunctionCall { name, args, line, column } => {
@@ -84,10 +199,11 @@ impl Runtime {
                         let value = self.evaluate_expr(expr)?;
                         match value {
                             Value::String(s) => Ok(Value::String(s)),
-                            Value::Number(n) => {
+                            Value::Number(Number::Integer(n)) => Ok(Value::String(n.to_string())),
+                            Value::Number(Number::Float(n)) => {
                                 let temp = format!("{:.10}", n);
                                 let formatted = temp.trim_end_matches('0').trim_end_matches('.');
-                                Ok(Value::String(formatted.parse().unwrap()))
+                                Ok(Value::String(formatted.to_string()))
                             }
                             Value::Boolean(b) => Ok(Value::String(b.to_string())),
                         }
@@ -107,7 +223,8 @@ impl Runtime {
                 let value = self.evaluate_expr(expr)?;
                 match value {
                     Value::String(s) => println!("{}", s),
-                    Value::Number(n) => {
+                    Value::Number(Number::Integer(n)) => println!("{}", n),
+                    Value::Number(Number::Float(n)) => {
                         let temp = format!("{:.10}", n);
                         let formatted = temp.trim_end_matches('0').trim_end_matches('.');
                         println!("{}", formatted);
