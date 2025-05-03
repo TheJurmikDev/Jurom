@@ -55,55 +55,26 @@ impl ParseError {
 
     pub fn print(&self, code: &str) {
         let lines: Vec<&str> = code.lines().collect();
-        let line_str = lines.get(self.line - 1).unwrap_or(&"");
 
-        let translated_message = match self.message.as_str() {
-            "Missing semicolon" => "Chybí středník za deklarací proměnné".to_string(),
-            "Division by zero" => "Nelze dělit nulou".to_string(),
-            msg if msg.starts_with("Invalid syntax: unexpected") => {
-                format!("Neplatná syntaxe: neočekávaný token '{}'", msg.split("'").nth(1).unwrap_or(""))
-            }
-            msg if msg.starts_with("Variable ") && msg.ends_with(" not found") => {
-                let var_name = msg.strip_prefix("Variable ").unwrap().strip_suffix(" not found").unwrap();
-                format!("Proměnná '{}' nenalezena", var_name)
-            }
-            msg if msg.starts_with("Variable ") && msg.ends_with(" already declared") => {
-                let var_name = msg.strip_prefix("Variable ").unwrap().strip_suffix(" already declared").unwrap();
-                format!("Proměnná '{}' již byla deklarována", var_name)
-            }
-            "Unclosed if block" => "Neuzavřený blok 'if'".to_string(),
-            "Unclosed class or function block" => "Neuzavřený blok třídy nebo funkce".to_string(),
-            "Nested classes are not supported" => "Vnořené třídy nejsou podporovány".to_string(),
-            "Nested functions are not supported" => "Vnořené funkce nejsou podporovány".to_string(),
-            "Else without matching if" => "Větev 'else' bez odpovídajícího 'if'".to_string(),
-            msg => msg.to_string(),
-        };
-
-        let color2 = Color::BrightRed;
-        let white = (255, 255, 255);
-
+        eprintln!("{}", "┏────────────────────────────────────────".bright_red());
         eprintln!(
-            "┃ {}: {}",
-            "Chyba".bold().color(color2),
-            translated_message.custom_color(white)
+            "{} {}: {}",
+            "┃".bright_red(),
+            "Error".bright_red().bold(),
+            self.message
         );
         eprintln!(
-            "┃ {}: Řádek {}, Sloupec {}",
-            "Umístění".bold().color(color2),
-            self.line.to_string().color(color2),
-            self.column.to_string().color(color2)
+            "{} {}: {}, {}",
+            "┃".bright_red(),
+            "Location".bright_red().bold(),
+            format!("Line {}", self.line),
+            format!("Column {}", self.column)
         );
-        eprintln!(
-            "┃ {}: {}",
-            "Kód".bold().color(color2),
-            line_str.custom_color(white)
-        );
-        eprintln!(
-            "┃   {}  {}{}",
-            " ".repeat(self.line.to_string().len()),
-            " ".repeat(self.column - 1),
-            "^".bold().color(color2)
-        );
+        if self.line > 0 && self.line <= lines.len() {
+            let line_content = lines[self.line - 1].trim_end();
+            eprintln!("{} {}: {}", "┃".bright_red(), "Code".bright_red(), line_content);
+        }
+        eprintln!("{}", "┃".bright_red());
     }
 }
 

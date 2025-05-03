@@ -1,8 +1,8 @@
 [package]
 name = "jurom"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-nom = "7.1.1"
-colored = "3.0.0"
+nom = "7.1.3"
+colored = "2.1.0"
