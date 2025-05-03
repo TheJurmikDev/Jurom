@@ -43,7 +43,6 @@ impl Runtime {
         match expr {
             Expr::Literal(Literal::String(s), _line, _column) => Ok(Value::String(s.clone())),
             Expr::Literal(Literal::Number(n), _line, _column) => {
-                // Pokud je číslo celé, uložíme jako Integer, jinak jako Float
                 if n.fract() == 0.0 && *n >= (i64::MIN as f64) && *n <= (i64::MAX as f64) {
                     Ok(Value::Number(Number::Integer(*n as i64)))
                 } else {
@@ -68,7 +67,6 @@ impl Runtime {
                                 if r == 0 {
                                     Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
                                 } else {
-                                    // Pokud je výsledek celé číslo, vrátíme Integer
                                     let result = l / r;
                                     if result >= i64::MIN && result <= i64::MAX && result % 1 == 0 {
                                         Ok(Value::Number(Number::Integer(result)))
@@ -138,7 +136,6 @@ impl Runtime {
                                 }
                             },
                             (Number::Float(l), Number::Float(r)) => {
-                                // Použijeme toleranci pro porovnání f64
                                 const EPSILON: f64 = 1e-10;
                                 match op.as_str() {
                                     "==" => (l - r).abs() < EPSILON,
@@ -348,7 +345,6 @@ impl Runtime {
     }
 }
 
-// Pomocná metoda pro získání řádku a sloupce z Expr
 impl Expr {
     pub fn get_line(&self) -> usize {
         match self {

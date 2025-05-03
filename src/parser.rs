@@ -59,7 +59,7 @@ impl ParseError {
 
         let translated_message = match self.message.as_str() {
             "Missing semicolon" => "Chybí středník za deklarací proměnné".to_string(),
-            "Division by zero" => "Dělení nulou".to_string(),
+            "Division by zero" => "Nelze dělit nulou".to_string(),
             msg if msg.starts_with("Invalid syntax: unexpected") => {
                 format!("Neplatná syntaxe: neočekávaný token '{}'", msg.split("'").nth(1).unwrap_or(""))
             }
@@ -369,7 +369,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut if_body: Vec<Stmt> = Vec::new();
     let mut else_body: Vec<Stmt> = Vec::new();
     let mut in_else = false;
-    let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new(); // Sledujeme deklarované proměnné
+    let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new();
 
     let lines: Vec<&str> = code.lines().collect();
     for (line_num, line) in lines.iter().enumerate() {
@@ -395,7 +395,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             }
             current_class = Some(class_name);
             class_body = Vec::new();
-            declared_variables.clear(); // Reset proměnných pro novou třídu
+            declared_variables.clear();
             continue;
         } else if trimmed.starts_with("function") {
             let func_name = trimmed
@@ -412,7 +412,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             }
             current_function = Some(func_name);
             function_body = Vec::new();
-            declared_variables.clear(); // Reset proměnných pro novou funkci
+            declared_variables.clear();
             continue;
         } else if trimmed == "} else {" {
             if in_else {
