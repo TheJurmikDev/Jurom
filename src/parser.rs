@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 use colored::*;
 use nom::{
@@ -33,6 +34,7 @@ pub enum Stmt {
     ClassDecl(String, Vec<Stmt>),
     FunctionDecl(String, Vec<Stmt>),
     VariableDecl(String, String, Expr),
+    Assignment(String, Expr),
     Expr(Expr),
     FunctionCall(String),
     If(Expr, Vec<Stmt>, Option<Box<Stmt>>),
@@ -63,6 +65,10 @@ impl ParseError {
             msg if msg.starts_with("Variable ") && msg.ends_with(" not found") => {
                 let var_name = msg.strip_prefix("Variable ").unwrap().strip_suffix(" not found").unwrap();
                 format!("Proměnná '{}' nenalezena", var_name)
+            }
+            msg if msg.starts_with("Variable ") && msg.ends_with(" already declared") => {
+                let var_name = msg.strip_prefix("Variable ").unwrap().strip_suffix(" already declared").unwrap();
+                format!("Proměnná '{}' již byla deklarována", var_name)
             }
             "Unclosed if block" => "Neuzavřený blok 'if'".to_string(),
             "Unclosed class or function block" => "Neuzavřený blok třídy nebo funkce".to_string(),
@@ -265,6 +271,24 @@ fn parse_variable_decl(input: &str, line: usize, column: usize) -> IResult<&str,
     )(input)
 }
 
+fn parse_assignment(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
+    context(
+        "assignment",
+        map(
+            tuple((
+                alphanumeric1,
+                multispace0,
+                tag("="),
+                multispace0,
+                |i| parse_expression(i, line, column),
+                multispace0,
+                tag(";"),
+            )),
+            |(var_name, _, _, _, value, _, _)| Stmt::Assignment(var_name.to_string(), value),
+        ),
+    )(input)
+}
+
 fn parse_function_call(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
     context(
         "function call",
@@ -323,6 +347,7 @@ fn parse_line(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
                 Stmt::If(condition, body, None)
             }),
             |i| parse_variable_decl(i, line, column),
+            |i| parse_assignment(i, line, column),
             map(|i| parse_println(i, line, column), Stmt::Expr),
             map(|i| parse_function_call(i, line, column), Stmt::Expr),
             map(tag("}"), |_| {
@@ -343,6 +368,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut if_body: Vec<Stmt> = Vec::new();
     let mut else_body: Vec<Stmt> = Vec::new();
     let mut in_else = false;
+    let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new(); // Sledujeme deklarované proměnné
 
     let lines: Vec<&str> = code.lines().collect();
     for (line_num, line) in lines.iter().enumerate() {
@@ -368,6 +394,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             }
             current_class = Some(class_name);
             class_body = Vec::new();
+            declared_variables.clear(); // Reset proměnných pro novou třídu
             continue;
         } else if trimmed.starts_with("function") {
             let func_name = trimmed
@@ -384,6 +411,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             }
             current_function = Some(func_name);
             function_body = Vec::new();
+            declared_variables.clear(); // Reset proměnných pro novou funkci
             continue;
         } else if trimmed == "} else {" {
             if in_else {
@@ -510,6 +538,20 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 current_if = Some((condition.clone(), vec![]));
                 if_body = Vec::new();
             }
+            Stmt::VariableDecl(_type_name, var_name, _) => {
+                if declared_variables.contains_key(var_name) {
+                    return Err(ParseError::new(
+                        format!("Variable {} already declared", var_name),
+                        line_num + 1,
+                        column,
+                    ));
+                }
+                declared_variables.insert(var_name.clone(), (line_num + 1, column));
+            }
+            _ => {}
+        }
+
+        match &stmt {
             _ => {
                 if in_else {
                     else_body.push(stmt.clone());

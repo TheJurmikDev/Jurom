@@ -20,6 +20,17 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                             let value = runtime.evaluate_expr(expr)?;
                             runtime.set_variable(var_name.clone(), value);
                         }
+                        Stmt::Assignment(var_name, expr) => {
+                            if runtime.get_variable(&var_name).is_none() {
+                                return Err(ParseError::new(
+                                    format!("Variable {} not found", var_name),
+                                    expr.get_line(),
+                                    expr.get_column(),
+                                ));
+                            }
+                            let value = runtime.evaluate_expr(expr)?;
+                            runtime.set_variable(var_name.clone(), value);
+                        }
                         _ => {}
                     }
                 }
@@ -34,6 +45,17 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                 let value = runtime.evaluate_expr(expr)?;
                 runtime.set_variable(var_name.clone(), value);
             }
+            Stmt::Assignment(var_name, expr) => {
+                if runtime.get_variable(&var_name).is_none() {
+                    return Err(ParseError::new(
+                        format!("Variable {} not found", var_name),
+                        expr.get_line(),
+                        expr.get_column(),
+                    ));
+                }
+                let value = runtime.evaluate_expr(expr)?;
+                runtime.set_variable(var_name.clone(), value);
+            }
             _ => {}
         }
     }
@@ -45,6 +67,17 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                     runtime.call_function(name, args, *line, *column)?;
                 }
                 Stmt::VariableDecl(_type_name, var_name, expr) => {
+                    let value = runtime.evaluate_expr(expr)?;
+                    runtime.set_variable(var_name.clone(), value);
+                }
+                Stmt::Assignment(var_name, expr) => {
+                    if runtime.get_variable(&var_name).is_none() {
+                        return Err(ParseError::new(
+                            format!("Variable {} not found", var_name),
+                            expr.get_line(),
+                            expr.get_column(),
+                        ));
+                    }
                     let value = runtime.evaluate_expr(expr)?;
                     runtime.set_variable(var_name.clone(), value);
                 }

@@ -133,6 +133,17 @@ impl Runtime {
                         let value = self.evaluate_expr(&expr)?;
                         self.set_variable(var_name, value);
                     }
+                    Stmt::Assignment(var_name, expr) => {
+                        if self.get_variable(&var_name).is_none() {
+                            return Err(ParseError::new(
+                                format!("Variable {} not found", var_name),
+                                line,
+                                column,
+                            ));
+                        }
+                        let value = self.evaluate_expr(&expr)?;
+                        self.set_variable(var_name, value);
+                    }
                     Stmt::If(condition, body, else_branch) => {
                         self.execute_if(&condition, &*body, &else_branch)?;
                     }
@@ -161,6 +172,17 @@ impl Runtime {
                             let value = self.evaluate_expr(expr)?;
                             self.set_variable(var_name.clone(), value);
                         }
+                        Stmt::Assignment(var_name, expr) => {
+                            if self.get_variable(&var_name).is_none() {
+                                return Err(ParseError::new(
+                                    format!("Variable {} not found", var_name),
+                                    condition.get_line(),
+                                    condition.get_column(),
+                                ));
+                            }
+                            let value = self.evaluate_expr(&expr)?;
+                            self.set_variable(var_name.clone(), value);
+                        }
                         Stmt::If(condition, body, else_branch) => {
                             self.execute_if(condition, body, else_branch)?;
                         }
@@ -181,6 +203,17 @@ impl Runtime {
                                         let value = self.evaluate_expr(expr)?;
                                         self.set_variable(var_name.clone(), value);
                                     }
+                                    Stmt::Assignment(var_name, expr) => {
+                                        if self.get_variable(&var_name).is_none() {
+                                            return Err(ParseError::new(
+                                                format!("Variable {} not found", var_name),
+                                                condition.get_line(),
+                                                condition.get_column(),
+                                            ));
+                                        }
+                                        let value = self.evaluate_expr(&expr)?;
+                                        self.set_variable(var_name.clone(), value);
+                                    }
                                     Stmt::If(condition, body, else_branch) => {
                                         self.execute_if(condition, body, else_branch)?;
                                     }
@@ -195,5 +228,28 @@ impl Runtime {
             _ => return Err(ParseError::new("If condition must evaluate to a boolean".to_string(), 0, 0)),
         }
         Ok(())
+    }
+}
+
+// Pomocná metoda pro získání řádku a sloupce z Expr
+impl Expr {
+    pub fn get_line(&self) -> usize {
+        match self {
+            Expr::FunctionCall { line, .. } => *line,
+            Expr::Literal(_, line, _) => *line,
+            Expr::Variable(_, line, _) => *line,
+            Expr::BinaryOp(_, _, _, line, _) => *line,
+            Expr::Comparison(_, _, _, line, _) => *line,
+        }
+    }
+
+    pub fn get_column(&self) -> usize {
+        match self {
+            Expr::FunctionCall { column, .. } => *column,
+            Expr::Literal(_, _, column) => *column,
+            Expr::Variable(_, _, column) => *column,
+            Expr::BinaryOp(_, _, _, _, column) => *column,
+            Expr::Comparison(_, _, _, _, column) => *column,
+        }
     }
 }
