@@ -8,7 +8,7 @@ use nom::{
     combinator::map,
     sequence::tuple,
     number::complete::double,
-    error::context,
+    error::{context, Error, ErrorKind},
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -17,14 +17,14 @@ pub enum Expr {
     Literal(Literal),
     Variable(String),
     BinaryOp(Box<Expr>, String, Box<Expr>),
-    Comparison(Box<Expr>, String, Box<Expr>), // New: For ==, <, >
+    Comparison(Box<Expr>, String, Box<Expr>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     String(String),
     Number(f64),
-    Boolean(bool), // New: Boolean literals
+    Boolean(bool),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -34,7 +34,8 @@ pub enum Stmt {
     VariableDecl(String, String, Expr),
     Expr(Expr),
     FunctionCall(String),
-    If(Expr, Vec<Stmt>, Option<Box<Stmt>>), // New: If with optional else
+    If(Expr, Vec<Stmt>, Option<Box<Stmt>>),
+    Block(Vec<Stmt>),
 }
 
 #[derive(Debug)]
@@ -103,6 +104,7 @@ fn parse_binary_op(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_comparison(input: &str) -> IResult<&str, Expr> {
+    println!("Attempting to parse comparison: {}", input);
     context(
         "comparison operation",
         map(
@@ -114,10 +116,39 @@ fn parse_comparison(input: &str) -> IResult<&str, Expr> {
                 parse_operand,
             )),
             |(left, _, op, _, right)| {
+                println!("Parsed comparison: {:?} {} {:?}", left, op, right);
                 Expr::Comparison(Box::new(left), op.to_string(), Box::new(right))
             },
         ),
     )(input)
+}
+
+fn parse_if_condition(input: &str) -> IResult<&str, Expr> {
+    println!("Attempting to parse if condition: {}", input);
+    let (rest, expr) = context(
+        "if condition",
+        alt((
+            parse_comparison,
+            map(parse_boolean, |b: bool| Expr::Literal(Literal::Boolean(b))),
+            parse_variable,
+        )),
+    )(input)?;
+    println!("Remaining input after if condition: {}", rest);
+    Ok((rest, expr))
+}
+
+fn parse_condition_in_parens(input: &str) -> IResult<&str, Expr> {
+    println!("Attempting to parse condition in parens: {}", input);
+    let (rest, expr) = context(
+        "condition in parentheses",
+        delimited(
+            tuple((multispace0, tag("("), multispace0)),
+            parse_if_condition,
+            tuple((multispace0, tag(")"), multispace0)),
+        ),
+    )(input)?;
+    println!("Remaining input after condition in parens: {}", rest);
+    Ok((rest, expr))
 }
 
 fn parse_expression(input: &str) -> IResult<&str, Expr> {
@@ -141,9 +172,10 @@ fn parse_println(input: &str) -> IResult<&str, Expr> {
             tuple((
                 tag("system.console.println("),
                 parse_expression,
-                tag(");"),
+                tag(")"),
+                nom::combinator::opt(tag(";")),
             )),
-            |(_, content, _)| Expr::FunctionCall("println".to_string(), vec![content]),
+            |(_, content, _, _)| Expr::FunctionCall("println".to_string(), vec![content]),
         ),
     )(input)
 }
@@ -153,7 +185,7 @@ fn parse_variable_decl(input: &str) -> IResult<&str, Stmt> {
         "variable declaration",
         map(
             tuple((
-                alt((tag("num"), tag("string"), tag("boolean"))), // Added boolean
+                alt((tag("num"), tag("string"), tag("boolean"))),
                 multispace0,
                 alphanumeric1,
                 multispace0,
@@ -180,65 +212,54 @@ fn parse_function_call(input: &str) -> IResult<&str, Expr> {
     )(input)
 }
 
+#[allow(dead_code)]
 fn parse_block(input: &str) -> IResult<&str, Vec<Stmt>> {
-    context(
+    println!("Attempting to parse block: {}", input);
+    let (rest, stmts) = context(
         "block",
         delimited(
             tuple((multispace0, tag("{"), multispace0)),
             nom::multi::many0(parse_line),
             tuple((multispace0, tag("}"), multispace0)),
         ),
-    )(input)
+    )(input)?;
+    println!("Remaining input after block: {}", rest);
+    Ok((rest, stmts))
 }
 
-fn parse_if(input: &str) -> IResult<&str, Stmt> {
-    context(
+fn parse_if(input: &str) -> IResult<&str, (Expr, Vec<Stmt>)> {
+    println!("Attempting to parse if: {}", input);
+    let (rest, (condition, _)): (&str, (Expr, Vec<Stmt>)) = context(
         "if statement",
         map(
             tuple((
                 tag("if"),
                 multispace0,
-                tag("("),
-                parse_expression,
-                tag(")"),
+                parse_condition_in_parens,
                 multispace0,
-                parse_block,
-                multispace0,
-                nom::combinator::opt(tuple((
-                    tag("else"),
-                    multispace0,
-                    alt((
-                        map(
-                            tuple((
-                                tag("if"),
-                                multispace0,
-                                tag("("),
-                                parse_expression,
-                                tag(")"),
-                                multispace0,
-                                parse_block,
-                            )),
-                            |(_, _, _, expr, _, _, body)| {
-                                Stmt::If(expr, body, None)
-                            },
-                        ),
-                        map(parse_block, |body| Stmt::If(Expr::Literal(Literal::Boolean(true)), body, None)), // else
-                    )),
-                ))),
+                tag("{"),
             )),
-            |(_, _, _, condition, _, _, if_body, _, else_branch)| {
-                let else_stmt = else_branch.map(|(_, _, stmt)| Box::new(stmt));
-                Stmt::If(condition, if_body, else_stmt)
-            },
+            |(_, _, condition, _, _)| (condition, vec![]),
         ),
-    )(input)
+    )(input)?;
+    println!("Parsed if condition: {:?}", condition);
+    println!("Remaining input after if: {}", rest);
+    Ok((rest, (condition, vec![])))
 }
 
 fn parse_line(line: &str) -> IResult<&str, Stmt> {
+    let trimmed = line.trim();
+    println!("Attempting to parse line: {}", trimmed);
+    if trimmed.is_empty() {
+        return Err(nom::Err::Error(Error {
+            input: trimmed,
+            code: ErrorKind::Fail,
+        }));
+    }
     context(
         "line",
         alt((
-            parse_if,
+            map(parse_if, |(condition, body)| Stmt::If(condition, body, None)),
             parse_variable_decl,
             map(parse_println, Stmt::Expr),
             map(parse_function_call, Stmt::Expr),
@@ -246,22 +267,27 @@ fn parse_line(line: &str) -> IResult<&str, Stmt> {
                 Stmt::Expr(Expr::Literal(Literal::String("END_BLOCK".to_string())))
             }),
             map(tag("main();"), |_| Stmt::FunctionCall("main".to_string())),
-            map(|_| Ok(("", "")), |_| {
-                Stmt::Expr(Expr::Literal(Literal::String("".to_string())))
-            }),
         )),
-    )(line.trim())
+    )(trimmed)
 }
 
 pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut stmts = Vec::new();
     let mut current_class: Option<String> = None;
     let mut current_function: Option<String> = None;
+    let mut current_if: Option<(Expr, Vec<Stmt>)> = None;
     let mut class_body: Vec<Stmt> = Vec::new();
     let mut function_body: Vec<Stmt> = Vec::new();
+    let mut if_body: Vec<Stmt> = Vec::new();
+    let mut else_body: Vec<Stmt> = Vec::new();
+    let mut in_else = false;
 
     for line in code.lines() {
         let trimmed = line.trim();
+        println!("Parsing line: {}", trimmed);
+        if trimmed.is_empty() {
+            continue;
+        }
         if trimmed.starts_with("public class") {
             let class_name = trimmed
                 .replace("public class", "")
@@ -290,15 +316,110 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             current_function = Some(func_name);
             function_body = Vec::new();
             continue;
+        } else if trimmed == "} else {" {
+            println!("Detected combined }} else {{");
+            // Process the closing brace as END_BLOCK
+            if in_else {
+                if let Some((condition, if_body)) = current_if.take() {
+                    let else_stmt = Some(Box::new(Stmt::Block(else_body.clone())));
+                    if current_function.is_some() {
+                        function_body.push(Stmt::If(condition.clone(), if_body, else_stmt));
+                    } else if current_class.is_some() {
+                        class_body.push(Stmt::If(condition.clone(), if_body, else_stmt));
+                    } else {
+                        stmts.push(Stmt::If(condition.clone(), if_body, else_stmt));
+                    }
+                    current_if = Some((condition, vec![])); // Restore current_if for else branch
+                }
+                else_body.clear();
+            } else if let Some((condition, mut body)) = current_if.take() {
+                body.append(&mut if_body);
+                let else_stmt = if else_body.is_empty() {
+                    None
+                } else {
+                    Some(Box::new(Stmt::Block(else_body.clone())))
+                };
+                if current_function.is_some() {
+                    function_body.push(Stmt::If(condition.clone(), body, else_stmt));
+                    println!("Final If: {:?}", function_body);
+                } else if current_class.is_some() {
+                    class_body.push(Stmt::If(condition.clone(), body, else_stmt));
+                } else {
+                    stmts.push(Stmt::If(condition.clone(), body, else_stmt));
+                }
+                current_if = Some((condition, vec![])); // Restore current_if for else branch
+                if_body.clear();
+                else_body.clear();
+            }
+            // Start the else branch
+            in_else = true;
+            else_body = Vec::new();
+            continue;
+        } else if trimmed == "else {" {
+            if current_if.is_none() {
+                return Err(ParseError {
+                    message: "Else without matching if".to_string(),
+                });
+            }
+            in_else = true;
+            else_body = Vec::new();
+            continue;
         }
 
-        let (_, stmt) = parse_line(trimmed).map_err(|e| ParseError {
-            message: format!("Error while parsing line '{}': {:?}", trimmed, e),
+        let (rest, stmt) = parse_line(trimmed).map_err(|e| {
+            let message = match e {
+                nom::Err::Error(err) | nom::Err::Failure(err) => {
+                    format!(
+                        "Error while parsing line '{}': input='{}', code={:?}",
+                        trimmed, err.input, err.code
+                    )
+                }
+                nom::Err::Incomplete(_) => {
+                    format!("Incomplete input while parsing line '{}'", trimmed)
+                }
+            };
+            ParseError { message }
         })?;
+        if !rest.is_empty() {
+            return Err(ParseError {
+                message: format!("Unexpected tokens after parsing line '{}': {}", trimmed, rest),
+            });
+        }
+        println!("Parsed statement: {:?}", stmt);
 
         match &stmt {
             Stmt::Expr(Expr::Literal(Literal::String(s))) if s == "END_BLOCK" => {
-                if let Some(func_name) = current_function.take() {
+                if in_else {
+                    if let Some((condition, if_body)) = current_if.take() {
+                        let else_stmt = Some(Box::new(Stmt::Block(else_body.clone())));
+                        if current_function.is_some() {
+                            function_body.push(Stmt::If(condition, if_body, else_stmt));
+                        } else if current_class.is_some() {
+                            class_body.push(Stmt::If(condition, if_body, else_stmt));
+                        } else {
+                            stmts.push(Stmt::If(condition, if_body, else_stmt));
+                        }
+                    }
+                    in_else = false;
+                    else_body.clear();
+                } else if let Some((condition, mut body)) = current_if.take() {
+                    body.append(&mut if_body);
+                    let else_stmt = if else_body.is_empty() {
+                        None
+                    } else {
+                        Some(Box::new(Stmt::Block(else_body.clone())))
+                    };
+                    if current_function.is_some() {
+                        function_body.push(Stmt::If(condition, body, else_stmt));
+                        println!("Final If: {:?}", function_body);
+                    } else if current_class.is_some() {
+                        class_body.push(Stmt::If(condition, body, else_stmt));
+                    } else {
+                        stmts.push(Stmt::If(condition, body, else_stmt));
+                    }
+                    if_body.clear();
+                    else_body.clear();
+                } else if let Some(func_name) = current_function.take() {
                     class_body.push(Stmt::FunctionDecl(func_name, function_body.clone()));
                     function_body.clear();
                 } else if let Some(class_name) = current_class.take() {
@@ -306,8 +427,21 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                     class_body.clear();
                 }
             }
+            Stmt::If(condition, _, _) => {
+                if current_if.is_some() {
+                    return Err(ParseError {
+                        message: "Nested if statements are not supported".to_string(),
+                    });
+                }
+                current_if = Some((condition.clone(), vec![]));
+                if_body = Vec::new();
+            }
             _ => {
-                if current_function.is_some() {
+                if in_else {
+                    else_body.push(stmt.clone());
+                } else if current_if.is_some() {
+                    if_body.push(stmt.clone());
+                } else if current_function.is_some() {
                     function_body.push(stmt.clone());
                 } else if current_class.is_some() {
                     class_body.push(stmt.clone());
@@ -318,5 +452,17 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         }
     }
 
+    if current_if.is_some() {
+        return Err(ParseError {
+            message: "Unclosed if block".to_string(),
+        });
+    }
+    if current_function.is_some() || current_class.is_some() {
+        return Err(ParseError {
+            message: "Unclosed class or function block".to_string(),
+        });
+    }
+
+    println!("Final statements: {:?}", stmts);
     Ok(stmts)
 }

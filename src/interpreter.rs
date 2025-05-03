@@ -1,11 +1,13 @@
 use crate::parser::{Expr, Stmt};
-use crate::runtime::{Runtime, Value};
+use crate::runtime::{Runtime};
 
 pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
     let mut runtime = Runtime::new();
     let mut main_body = Vec::new();
 
+    println!("Processing statements: {:?}", stmts);
     for stmt in &stmts {
+        println!("Processing stmt: {:?}", stmt);
         match stmt {
             Stmt::ClassDecl(_, body) => {
                 for class_stmt in body {
@@ -39,7 +41,9 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
     }
 
     if !main_body.is_empty() {
+        println!("Executing main body: {:?}", main_body);
         for stmt in &main_body {
+            println!("Executing stmt: {:?}", stmt);
             match stmt {
                 Stmt::Expr(Expr::FunctionCall(name, args)) => {
                     runtime.call_function(name, args)?;
@@ -49,39 +53,7 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
                     runtime.set_variable(var_name.clone(), value);
                 }
                 Stmt::If(condition, body, else_branch) => {
-                    let condition_value = runtime.evaluate_expr(condition)?;
-                    match condition_value {
-                        Value::Boolean(true) => {
-                            for stmt in body {
-                                match stmt {
-                                    Stmt::Expr(Expr::FunctionCall(name, args)) => {
-                                        runtime.call_function(name, args)?;
-                                    }
-                                    Stmt::VariableDecl(_type_name, var_name, expr) => {
-                                        let value = runtime.evaluate_expr(expr)?;
-                                        runtime.set_variable(var_name.clone(), value);
-                                    }
-                                    Stmt::If(_, _, _) => {
-                                        execute(vec![stmt.clone()])?;
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        Value::Boolean(false) => {
-                            if let Some(else_stmt) = else_branch {
-                                match &**else_stmt {
-                                    Stmt::If(cond, body, else_br) => {
-                                        execute(vec![Stmt::If(cond.clone(), body.clone(), else_br.clone())])?;
-                                    }
-                                    _ => {
-                                        execute(vec![(**else_stmt).clone()])?;
-                                    }
-                                }
-                            }
-                        }
-                        _ => return Err("If condition must evaluate to a boolean".to_string()),
-                    }
+                    runtime.execute_if(condition, body, else_branch)?;
                 }
                 _ => {}
             }

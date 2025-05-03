@@ -16,9 +16,16 @@ fn main() {
     let path = Path::new(&args[1]);
     let code = fs::read_to_string(path).expect("Can't read file");
 
-    let stmts = parse_program(&code).expect("Error while parsing");
-    if let Err(e) = interpreter::execute(stmts) {
-        eprintln!("Error while executing: {}", e);
-        std::process::exit(1);
+    match parse_program(&code) {
+        Ok(stmts) => {
+            if let Err(e) = interpreter::execute(stmts) {
+                eprintln!("Error while executing: {}", e);
+                std::process::exit(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("Error while parsing: {}", e);
+            std::process::exit(1);
+        }
     }
 }
