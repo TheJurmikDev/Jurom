@@ -66,12 +66,15 @@ impl Runtime {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
-                    (Value::Number(l), Value::Number(r)) => match op.as_str() {
-                        "==" => Ok(Value::Boolean(l == r)),
-                        "<" => Ok(Value::Boolean(l < r)),
-                        ">" => Ok(Value::Boolean(l > r)),
-                        _ => Err(format!("Unknown comparison operator: {}", op)),
-                    },
+                    (Value::Number(l), Value::Number(r)) => {
+                        let result = match op.as_str() {
+                            "==" => l == r,
+                            "<" => l < r,
+                            ">" => l > r,
+                            _ => return Err(format!("Unknown comparison operator: {}", op)),
+                        };
+                        Ok(Value::Boolean(result))
+                    }
                     _ => Err("Comparison operations only supported for numbers".to_string()),
                 }
             }
