@@ -34,7 +34,6 @@ impl Runtime {
     }
 
     pub fn evaluate_expr(&self, expr: &Expr) -> Result<Value, String> {
-        println!("Evaluating expr: {:?}", expr); // Debug
         match expr {
             Expr::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
             Expr::Literal(Literal::Number(n)) => Ok(Value::Number(*n)),
@@ -66,10 +65,8 @@ impl Runtime {
             Expr::Comparison(left, op, right) => {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
-                println!("Comparing left: {:?}, right: {:?}", left_val, right_val); // Debug
                 match (left_val, right_val) {
                     (Value::Number(l), Value::Number(r)) => {
-                        println!("Operator: {}, l: {}, r: {}, result: {}", op, l, r, l == r); // Debug
                         let result = match op.as_str() {
                             "==" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Equal),
                             "<" => l.partial_cmp(&r) == Some(std::cmp::Ordering::Less),
@@ -105,7 +102,6 @@ impl Runtime {
     }
 
     pub fn call_function(&mut self, name: &str, args: &[Expr]) -> Result<(), String> {
-        println!("Calling function: {}", name); // Debug
         if name == "println" {
             if let Some(expr) = args.get(0) {
                 let value = self.evaluate_expr(expr)?;
@@ -153,12 +149,9 @@ impl Runtime {
         body: &[Stmt],
         else_branch: &Option<Box<Stmt>>,
     ) -> Result<(), String> {
-        println!("Evaluating if condition: {:?}", condition); // Debug
         let condition_value = self.evaluate_expr(condition)?;
-        println!("Condition result: {:?}", condition_value); // Debug
         match condition_value {
             Value::Boolean(true) => {
-                println!("Executing if body: {:?}", body); // Debug
                 for stmt in body {
                     match stmt {
                         Stmt::Expr(Expr::FunctionCall(name, args)) => {
@@ -176,7 +169,6 @@ impl Runtime {
                 }
             }
             Value::Boolean(false) => {
-                println!("Executing else branch: {:?}", else_branch); // Debug
                 if let Some(else_stmt) = else_branch {
                     match &**else_stmt {
                         Stmt::Block(stmts) => {

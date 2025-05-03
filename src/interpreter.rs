@@ -5,9 +5,7 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
     let mut runtime = Runtime::new();
     let mut main_body = Vec::new();
 
-    println!("Processing statements: {:?}", stmts);
     for stmt in &stmts {
-        println!("Processing stmt: {:?}", stmt);
         match stmt {
             Stmt::ClassDecl(_, body) => {
                 for class_stmt in body {
@@ -41,9 +39,7 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), String> {
     }
 
     if !main_body.is_empty() {
-        println!("Executing main body: {:?}", main_body);
         for stmt in &main_body {
-            println!("Executing stmt: {:?}", stmt);
             match stmt {
                 Stmt::Expr(Expr::FunctionCall(name, args)) => {
                     runtime.call_function(name, args)?;

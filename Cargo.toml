@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 nom = "7.1.1"
+colored = "3.0.0"
