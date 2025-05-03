@@ -54,16 +54,44 @@ impl ParseError {
     pub fn print(&self, code: &str) {
         let lines: Vec<&str> = code.lines().collect();
         let line_str = lines.get(self.line - 1).unwrap_or(&"");
-        eprintln!("{}", "Parse error".red().bold());
-        eprintln!("{}: {}", "Message".bold(), self.message);
-        eprintln!("{}: {}:{}", "Location".bold(), self.line, self.column);
-        eprintln!("{}", "Code:".bold());
-        eprintln!("{} | {}", self.line.to_string().blue(), line_str);
+
+        let translated_message = match self.message.as_str() {
+            "Missing semicolon" => "Chybí středník za deklarací proměnné".to_string(),
+            msg if msg.starts_with("Invalid syntax: unexpected") => {
+                format!("Neplatná syntaxe: neočekávaný token '{}'", msg.split("'").nth(1).unwrap_or(""))
+            }
+            "Unclosed if block" => "Neuzavřený blok 'if'".to_string(),
+            "Unclosed class or function block" => "Neuzavřený blok třídy nebo funkce".to_string(),
+            "Nested classes are not supported" => "Vnořené třídy nejsou podporovány".to_string(),
+            "Nested functions are not supported" => "Vnořené funkce nejsou podporovány".to_string(),
+            "Else without matching if" => "Větev 'else' bez odpovídajícího 'if'".to_string(),
+            msg => msg.to_string(),
+        };
+
+        let color2 = Color::BrightRed;
+        let white = (255, 255, 255);
+
         eprintln!(
-            "{} | {}{}",
+            "┃ {}: {}",
+            "Chyba".bold().color(color2),
+            translated_message.custom_color(white)
+        );
+        eprintln!(
+            "┃ {}: Řádek {}, Sloupec {}",
+            "Umístění".bold().color(color2),
+            self.line.to_string().color(color2),
+            self.column.to_string().color(color2)
+        );
+        eprintln!(
+            "┃ {}: {}",
+            "Kód".bold().color(color2),
+            line_str.custom_color(white)
+        );
+        eprintln!(
+            "┃   {}  {}{}",
             " ".repeat(self.line.to_string().len()),
             " ".repeat(self.column - 1),
-            "^".yellow().bold()
+            "^".bold().color(color2)
         );
     }
 }
@@ -389,7 +417,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 }
                 nom::Err::Incomplete(_) => "Incomplete input".to_string(),
             };
-            // Calculate error column using err.input
             let error_input = match &e {
                 nom::Err::Error(err) | nom::Err::Failure(err) => err.input,
                 nom::Err::Incomplete(_) => trimmed,
