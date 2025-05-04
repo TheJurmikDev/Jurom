@@ -9,5 +9,6 @@
 - variables overwritting
 - dynamic number format on num
 - if, else if, else statement
+- while function
 - system.console.println that prints to console
 - +, -, =, <=, >=, >, <, /, *
