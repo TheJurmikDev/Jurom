@@ -45,6 +45,7 @@ pub enum Stmt {
     },
     Block(Vec<Stmt>),
     While { condition: Expr, body: Vec<Stmt> },
+    Break,
 }
 
 #[derive(Debug)]
@@ -136,21 +137,31 @@ fn parse_operand(input: &str, line: usize, column: usize) -> IResult<&str, Expr>
 }
 
 fn parse_binary_op(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "binary operation",
-        map(
-            tuple((
-                |i| parse_operand(i, line, column),
+    context("binary operation", |input| {
+        let (mut input, mut left) = parse_expression(input, line, column)?;
+        loop {
+            let (next_input, maybe_op) = opt(tuple((
                 multispace0,
-                one_of("+*/"),
+                one_of("+"),
                 multispace0,
-                |i| parse_operand(i, line, column),
-            )),
-            |(left, _, op, _, right)| {
-                Expr::BinaryOp(Box::new(left), op.to_string(), Box::new(right), line, column)
-            },
-        ),
-    )(input)
+            )))(input)?;
+            match maybe_op {
+                Some((_, op, _)) => {
+                    let (next_input, right) = parse_expression(next_input, line, column)?;
+                    left = Expr::BinaryOp(
+                        Box::new(left),
+                        op.to_string(),
+                        Box::new(right),
+                        line,
+                        column,
+                    );
+                    input = next_input;
+                }
+                None => break,
+            }
+        }
+        Ok((input, left))
+    })(input)
 }
 
 fn parse_comparison(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
@@ -179,6 +190,7 @@ fn parse_if_condition(input: &str, line: usize, column: usize) -> IResult<&str, 
     context(
         "if condition",
         alt((
+            |i| parse_logical_op(i, line, column),
             |i| parse_comparison(i, line, column),
             |i| parse_boolean(i, line, column),
             |i| parse_variable(i, line, column),
@@ -217,9 +229,7 @@ fn parse_println(input: &str, line: usize, column: usize) -> IResult<&str, Expr>
         map(
             tuple((
                 tag("system.console.println("),
-                |i| {
-                    parse_expression(i, line, column)
-                },
+                |i| parse_expression(i, line, column),
                 tag(")"),
                 opt(tag(";")),
             )),
@@ -228,6 +238,24 @@ fn parse_println(input: &str, line: usize, column: usize) -> IResult<&str, Expr>
                 args: vec![content],
                 line,
                 column,
+            },
+        ),
+    )(input)
+}
+
+fn parse_logical_op(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    context(
+        "logical operation",
+        map(
+            tuple((
+                |i| parse_comparison(i, line, column),
+                multispace0,
+                alt((tag("&&"), tag("||"))),
+                multispace0,
+                |i| parse_comparison(i, line, column),
+            )),
+            |(left, _, op, _, right)| {
+                Expr::BinaryOp(Box::new(left), op.to_string(), Box::new(right), line, column)
             },
         ),
     )(input)
@@ -394,6 +422,7 @@ fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str
             map(|i| parse_println(i, line, column), |expr| (Stmt::Expr(expr), None)),
             map(|i| parse_function_call(i, line, column), |expr| (Stmt::Expr(expr), None)),
             map(|i| parse_while(i, line, column), |stmt| (stmt, None)),
+            map(tag("break;"), |_| (Stmt::Break, None)),
             map(
                 tuple((
                     tag("}"),
