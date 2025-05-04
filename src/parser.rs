@@ -226,7 +226,7 @@ fn parse_println(input: &str, line: usize, column: usize) -> IResult<&str, Expr>
                     parse_expression(i, line, column)
                 },
                 tag(")"),
-                nom::combinator::opt(tag(";")),
+                opt(tag(";")),
             )),
             |(_, content, _, _)| Expr::FunctionCall {
                 name: "println".to_string(),
