@@ -315,10 +315,8 @@ impl Runtime {
         else_branch: &Option<Box<Stmt>>,
     ) -> Result<(), ParseError> {
         let condition_value = self.evaluate_expr(condition)?;
-        println!("Evaluated if condition: {:?} -> {:?}", condition, condition_value);
         if let Value::Boolean(true) = condition_value {
             self.push_scope();
-            println!("Executing if body: {:?}", body);
             for stmt in body {
                 match stmt {
                     Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
@@ -360,10 +358,8 @@ impl Runtime {
             let mut executed = false;
             for (else_if_condition, else_if_body) in else_if_branches {
                 let else_if_value = self.evaluate_expr(else_if_condition)?;
-                println!("Evaluated else_if condition: {:?} -> {:?}", else_if_condition, else_if_value);
                 if let Value::Boolean(true) = else_if_value {
                     self.push_scope();
-                    println!("Executing else_if body: {:?}", else_if_body);
                     for stmt in else_if_body {
                         match stmt {
                             Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
@@ -408,7 +404,6 @@ impl Runtime {
             if !executed {
                 if let Some(else_stmt) = else_branch {
                     self.push_scope();
-                    println!("Executing else branch: {:?}", else_stmt);
                     match &**else_stmt {
                         Stmt::Block(stmts) => {
                             for stmt in stmts {
