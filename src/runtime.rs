@@ -59,10 +59,6 @@ impl Runtime {
             self.push_scope();
             for stmt in body {
                 match stmt {
-                    Stmt::Break => {
-                        self.pop_scope();
-                        return Ok(());
-                    }
                     Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
                         self.call_function(name, args, *line, *column)?;
                     }
@@ -120,17 +116,6 @@ impl Runtime {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
-                    (Value::Boolean(left_bool), Value::Boolean(right_bool)) => {
-                        match op.as_str() {
-                            "&&" => Ok(Value::Boolean(left_bool && right_bool)),
-                            "||" => Ok(Value::Boolean(left_bool || right_bool)),
-                            _ => Err(ParseError::new(
-                                format!("Operator {} not supported for booleans", op),
-                                *line,
-                                *column,
-                            )),
-                        }
-                    }
                     (Value::Number(left_num), Value::Number(right_num)) => match (left_num, right_num) {
                         (Number::Integer(l), Number::Integer(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Integer(l + r))),
@@ -186,70 +171,7 @@ impl Runtime {
                             _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
                         },
                     },
-                    (Value::String(left_str), Value::String(right_str)) => {
-                        if op == "+" {
-                            Ok(Value::String(left_str + &right_str))
-                        } else {
-                            Err(ParseError::new(
-                                format!("Operator {} not supported for strings", op),
-                                *line,
-                                *column,
-                            ))
-                        }
-                    }
-                    (Value::String(left_str), Value::Number(Number::Integer(n))) => {
-                        if op == "+" {
-                            Ok(Value::String(left_str + &n.to_string()))
-                        } else {
-                            Err(ParseError::new(
-                                format!("Operator {} not supported for string and number", op),
-                                *line,
-                                *column,
-                            ))
-                        }
-                    }
-                    (Value::String(left_str), Value::Number(Number::Float(n))) => {
-                        if op == "+" {
-                            let temp = format!("{:.10}", n);
-                            let formatted = temp.trim_end_matches('0').trim_end_matches('.');
-                            Ok(Value::String(left_str + formatted))
-                        } else {
-                            Err(ParseError::new(
-                                format!("Operator {} not supported for string and number", op),
-                                *line,
-                                *column,
-                            ))
-                        }
-                    }
-                    (Value::Number(Number::Integer(n)), Value::String(right_str)) => {
-                        if op == "+" {
-                            Ok(Value::String(n.to_string() + &right_str))
-                        } else {
-                            Err(ParseError::new(
-                                format!("Operator {} not supported for number and string", op),
-                                *line,
-                                *column,
-                            ))
-                        }
-                    }
-                    (Value::Number(Number::Float(n)), Value::String(right_str)) => {
-                        if op == "+" {
-                            let temp = format!("{:.10}", n);
-                            let formatted = temp.trim_end_matches('0').trim_end_matches('.');
-                            Ok(Value::String(formatted.to_string() + &right_str))
-                        } else {
-                            Err(ParseError::new(
-                                format!("Operator {} not supported for number and string", op),
-                                *line,
-                                *column,
-                            ))
-                        }
-                    }
-                    _ => Err(ParseError::new(
-                        "Binary operations only supported for numbers, strings with +, or booleans with &&/||".to_string(),
-                        *line,
-                        *column,
-                    )),
+                    _ => Err(ParseError::new("Binary operations only supported for numbers".to_string(), *line, *column)),
                 }
             }
             Expr::Comparison(left, op, right, line, column) => {
