@@ -163,7 +163,7 @@ fn parse_comparison(input: &str, line: usize, column: usize) -> IResult<&str, Ex
                     parse_operand(i, line, column)
                 },
                 multispace0,
-                alt((tag("=="), tag("!="), tag("<"), tag(">"), tag("<="), tag(">="))),
+                alt((tag("=="), tag("!="), tag("<="), tag(">="), tag("<"), tag(">"))),
                 multispace0,
                 |i| {
                     println!("Parsing right operand: '{}'", i);
@@ -381,8 +381,8 @@ fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str
                     else_part,
                 ),
             ),
-            map(|i| parse_variable_decl(i, line, column), |stmt| (stmt, None)),
             map(|i| parse_assignment(i, line, column), |stmt| (stmt, None)),
+            map(|i| parse_variable_decl(i, line, column), |stmt| (stmt, None)),
             map(|i| parse_println(i, line, column), |expr| (Stmt::Expr(expr), None)),
             map(|i| parse_function_call(i, line, column), |expr| (Stmt::Expr(expr), None)),
             map(
@@ -417,7 +417,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut stmts = Vec::new();
     let mut current_class: Option<String> = None;
     let mut current_function: Option<String> = None;
-    let mut if_stack: Vec<(Expr, Vec<Stmt>, Vec<(Expr, Vec<Stmt>)>, Vec<Stmt>, bool, bool)> = Vec::new(); // (condition, if_body, else_if_branches, else_body, in_else, in_else_if)
+    let mut if_stack: Vec<(Expr, Vec<Stmt>, Vec<(Expr, Vec<Stmt>)>, Vec<Stmt>, bool, bool)> = Vec::new();
     let mut class_body: Vec<Stmt> = Vec::new();
     let mut function_body: Vec<Stmt> = Vec::new();
     let mut block_depth = 0;
@@ -514,7 +514,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         println!("Else part: {:?}", else_part);
         println!("If stack: {:?}", if_stack);
 
-        // Handle else_part
         if let Some((ref else_type, ref condition)) = else_part {
             if if_stack.is_empty() {
                 return Err(ParseError::new(
@@ -525,17 +524,17 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             }
             if else_type == "else if" {
                 if let Some(last) = if_stack.last_mut() {
-                    last.5 = true; // in_else_if = true
-                    last.2.push((condition.clone(), Vec::new())); // Add to else_if_branches
+                    last.5 = true;
+                    last.2.push((condition.clone(), Vec::new()));
                     if_block_depth += 1;
                     block_depth += 1;
                     println!("Added else_if branch: {:?}", condition);
                 }
             } else if else_type == "else" {
                 if let Some(last) = if_stack.last_mut() {
-                    last.4 = true; // in_else = true
-                    last.5 = false; // in_else_if = false
-                    last.3 = Vec::new(); // Reset else_body
+                    last.4 = true;
+                    last.5 = false;
+                    last.3 = Vec::new();
                     if_block_depth += 1;
                     block_depth += 1;
                     println!("Started else branch");
@@ -550,7 +549,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 if !if_stack.is_empty() {
                     if_block_depth -= 1;
                     if if_stack.last().map_or(false, |last| last.4 && if_block_depth <= 0) {
-                        // Finalize else branch
                         if let Some((condition, if_body, else_if_branches, else_body, _, _)) = if_stack.pop() {
                             let else_stmt = if else_body.is_empty() {
                                 None
@@ -589,15 +587,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                                 stmts.push(if_stmt.clone());
                                 println!("Added to stmts: {:?}", if_stmt);
                             }
-                            if_block_depth = if_stack.iter().map(|_| 1).sum(); // Recalculate based on open if blocks
+                            if_block_depth = if_stack.iter().map(|_| 1).sum();
                         }
                     } else if if_stack.last().map_or(false, |last| last.5 && if_block_depth <= 0) {
-                        // Exit else_if branch
                         if let Some(last) = if_stack.last_mut() {
-                            last.5 = false; // in_else_if = false
+                            last.5 = false;
                         }
                     } else if if_block_depth >= 0 && if_stack.last().map_or(false, |last| !last.5 && !last.4) {
-                        // Finalize if branch (including nested if)
                         if let Some((condition, if_body, else_if_branches, else_body, _, _)) = if_stack.pop() {
                             let else_stmt = if else_body.is_empty() {
                                 None
@@ -640,7 +636,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                         }
                     }
                 }
-                // Handle function and class closure at block_depth == 0
                 if block_depth == 0 {
                     if let Some(func_name) = current_function.take() {
                         class_body.push(Stmt::FunctionDecl(func_name.clone(), function_body));
@@ -660,7 +655,7 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 if_block_depth += 1;
                 println!("Started if with condition: {:?}", condition);
                 line_index += 1;
-                continue; // Skip adding this stmt to avoid duplication
+                continue;
             }
             Stmt::VariableDecl(_type_name, var_name, _) => {
                 if declared_variables.contains_key(var_name) {
@@ -672,10 +667,18 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 }
                 declared_variables.insert(var_name.clone(), (line_index + 1, column));
             }
+            Stmt::Assignment(var_name, _) => {
+                if !declared_variables.contains_key(var_name) {
+                    return Err(ParseError::new(
+                        format!("Variable {} not declared before assignment", var_name),
+                        line_index + 1,
+                        column,
+                    ));
+                }
+            }
             _ => {}
         }
 
-        // Add statements to the appropriate body
         if !matches!(&stmt, Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK") {
             println!("if_stack: {:?}", if_stack);
             if !if_stack.is_empty() {

@@ -16,14 +16,14 @@ pub enum Value {
 
 pub struct Runtime {
     functions: HashMap<String, Vec<Stmt>>,
-    variables: HashMap<String, Value>,
+    variable_scopes: Vec<HashMap<String, Value>>,
 }
 
 impl Runtime {
     pub fn new() -> Self {
         Runtime {
             functions: HashMap::new(),
-            variables: HashMap::new(),
+            variable_scopes: vec![HashMap::new()],
         }
     }
 
@@ -31,12 +31,27 @@ impl Runtime {
         self.functions.insert(name, body);
     }
 
+    pub fn push_scope(&mut self) {
+        self.variable_scopes.push(HashMap::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        if self.variable_scopes.len() > 1 {
+            self.variable_scopes.pop();
+        }
+    }
+
     pub fn set_variable(&mut self, name: String, value: Value) {
-        self.variables.insert(name, value);
+        self.variable_scopes.last_mut().unwrap().insert(name, value);
     }
 
     pub fn get_variable(&self, name: &str) -> Option<&Value> {
-        self.variables.get(name)
+        for scope in self.variable_scopes.iter().rev() {
+            if let Some(value) = scope.get(name) {
+                return Some(value);
+            }
+        }
+        None
     }
 
     pub fn evaluate_expr(&self, expr: &Expr) -> Result<Value, ParseError> {
@@ -250,6 +265,7 @@ impl Runtime {
                 .get(name)
                 .cloned()
                 .ok_or_else(|| ParseError::new(format!("Invalid function: {}", name), line, column))?;
+            self.push_scope();
             for stmt in body {
                 match stmt {
                     Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
@@ -268,7 +284,12 @@ impl Runtime {
                             ));
                         }
                         let value = self.evaluate_expr(&expr)?;
-                        self.set_variable(var_name, value);
+                        for scope in self.variable_scopes.iter_mut().rev() {
+                            if scope.contains_key(&var_name) {
+                                scope.insert(var_name.clone(), value);
+                                break;
+                            }
+                        }
                     }
                     Stmt::If {
                         condition,
@@ -281,6 +302,7 @@ impl Runtime {
                     _ => {}
                 }
             }
+            self.pop_scope();
             Ok(())
         }
     }
@@ -295,6 +317,7 @@ impl Runtime {
         let condition_value = self.evaluate_expr(condition)?;
         println!("Evaluated if condition: {:?} -> {:?}", condition, condition_value);
         if let Value::Boolean(true) = condition_value {
+            self.push_scope();
             println!("Executing if body: {:?}", body);
             for stmt in body {
                 match stmt {
@@ -314,7 +337,12 @@ impl Runtime {
                             ));
                         }
                         let value = self.evaluate_expr(expr)?;
-                        self.set_variable(var_name.clone(), value);
+                        for scope in self.variable_scopes.iter_mut().rev() {
+                            if scope.contains_key(var_name) {
+                                scope.insert(var_name.clone(), value);
+                                break;
+                            }
+                        }
                     }
                     Stmt::If {
                         condition,
@@ -327,12 +355,14 @@ impl Runtime {
                     _ => {}
                 }
             }
+            self.pop_scope();
         } else {
             let mut executed = false;
             for (else_if_condition, else_if_body) in else_if_branches {
                 let else_if_value = self.evaluate_expr(else_if_condition)?;
                 println!("Evaluated else_if condition: {:?} -> {:?}", else_if_condition, else_if_value);
                 if let Value::Boolean(true) = else_if_value {
+                    self.push_scope();
                     println!("Executing else_if body: {:?}", else_if_body);
                     for stmt in else_if_body {
                         match stmt {
@@ -352,7 +382,12 @@ impl Runtime {
                                     ));
                                 }
                                 let value = self.evaluate_expr(expr)?;
-                                self.set_variable(var_name.clone(), value);
+                                for scope in self.variable_scopes.iter_mut().rev() {
+                                    if scope.contains_key(var_name) {
+                                        scope.insert(var_name.clone(), value);
+                                        break;
+                                    }
+                                }
                             }
                             Stmt::If {
                                 condition,
@@ -365,12 +400,14 @@ impl Runtime {
                             _ => {}
                         }
                     }
+                    self.pop_scope();
                     executed = true;
                     break;
                 }
             }
             if !executed {
                 if let Some(else_stmt) = else_branch {
+                    self.push_scope();
                     println!("Executing else branch: {:?}", else_stmt);
                     match &**else_stmt {
                         Stmt::Block(stmts) => {
@@ -392,7 +429,12 @@ impl Runtime {
                                             ));
                                         }
                                         let value = self.evaluate_expr(expr)?;
-                                        self.set_variable(var_name.clone(), value);
+                                        for scope in self.variable_scopes.iter_mut().rev() {
+                                            if scope.contains_key(var_name) {
+                                                scope.insert(var_name.clone(), value);
+                                                break;
+                                            }
+                                        }
                                     }
                                     Stmt::If {
                                         condition,
@@ -408,6 +450,7 @@ impl Runtime {
                         }
                         _ => return Err(ParseError::new("Invalid else branch".to_string(), condition.get_line(), condition.get_column())),
                     }
+                    self.pop_scope();
                 }
             }
         }
