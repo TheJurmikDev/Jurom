@@ -1,5 +1,7 @@
 # TODO
 - fix main function must be first
+- add break
+- fix if not working in while
 
 # ALL THINGS
 - public class
