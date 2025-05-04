@@ -44,6 +44,7 @@ pub enum Stmt {
         else_branch: Option<Box<Stmt>>,
     },
     Block(Vec<Stmt>),
+    While { condition: Expr, body: Vec<Stmt> },
 }
 
 #[derive(Debug)]
@@ -297,6 +298,25 @@ fn parse_block(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
     )(input)
 }
 
+fn parse_while(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
+    context(
+        "while statement",
+        map(
+            tuple((
+                tag("while"),
+                multispace0,
+                |i| parse_condition_in_parens(i, line, column),
+                multispace0,
+                |i| parse_block(i, line, column),
+            )),
+            |(_, _, condition, _, _)| Stmt::While {
+                condition,
+                body: Vec::new(),
+            },
+        ),
+    )(input)
+}
+
 fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
     context(
         "if statement",
@@ -373,6 +393,7 @@ fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str
             map(|i| parse_variable_decl(i, line, column), |stmt| (stmt, None)),
             map(|i| parse_println(i, line, column), |expr| (Stmt::Expr(expr), None)),
             map(|i| parse_function_call(i, line, column), |expr| (Stmt::Expr(expr), None)),
+            map(|i| parse_while(i, line, column), |stmt| (stmt, None)),
             map(
                 tuple((
                     tag("}"),
@@ -405,10 +426,12 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut current_class: Option<String> = None;
     let mut current_function: Option<String> = None;
     let mut if_stack: Vec<(Expr, Vec<Stmt>, Vec<(Expr, Vec<Stmt>)>, Vec<Stmt>, bool, bool)> = Vec::new();
+    let mut while_stack: Vec<(Expr, Vec<Stmt>)> = Vec::new();
     let mut class_body: Vec<Stmt> = Vec::new();
     let mut function_body: Vec<Stmt> = Vec::new();
     let mut block_depth = 0;
     let mut if_block_depth = 0;
+    let mut while_block_depth = 0;
     let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new();
 
     let lines: Vec<&str> = code.lines().collect();
@@ -600,6 +623,37 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                         }
                     }
                 }
+                if !while_stack.is_empty() {
+                    while_block_depth -= 1;
+                    if while_block_depth <= 0 {
+                        if let Some((condition, while_body)) = while_stack.pop() {
+                            let while_stmt = Stmt::While {
+                                condition,
+                                body: while_body,
+                            };
+                            if !if_stack.is_empty() {
+                                if let Some(last) = if_stack.last_mut() {
+                                    if last.4 {
+                                        last.3.push(while_stmt.clone());
+                                    } else if last.5 && !last.2.is_empty() {
+                                        if let Some(last_branch) = last.2.last_mut() {
+                                            last_branch.1.push(while_stmt.clone());
+                                        }
+                                    } else {
+                                        last.1.push(while_stmt.clone());
+                                    }
+                                }
+                            } else if current_function.is_some() {
+                                function_body.push(while_stmt.clone());
+                            } else if current_class.is_some() {
+                                class_body.push(while_stmt.clone());
+                            } else {
+                                stmts.push(while_stmt.clone());
+                            }
+                            while_block_depth = while_stack.iter().map(|_| 1).sum();
+                        }
+                    }
+                }
                 if block_depth == 0 {
                     if let Some(func_name) = current_function.take() {
                         class_body.push(Stmt::FunctionDecl(func_name.clone(), function_body));
@@ -615,6 +669,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 if_stack.push((condition.clone(), Vec::new(), Vec::new(), Vec::new(), false, false));
                 block_depth += 1;
                 if_block_depth += 1;
+                line_index += 1;
+                continue;
+            }
+            Stmt::While { condition, .. } => {
+                while_stack.push((condition.clone(), Vec::new()));
+                block_depth += 1;
+                while_block_depth += 1;
                 line_index += 1;
                 continue;
             }
@@ -653,6 +714,10 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                         last.1.push(stmt.clone());
                     }
                 }
+            } else if !while_stack.is_empty() {
+                if let Some(last) = while_stack.last_mut() {
+                    last.1.push(stmt.clone());
+                }
             } else if current_function.is_some() {
                 function_body.push(stmt.clone());
             } else if current_class.is_some() {
@@ -668,6 +733,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     if !if_stack.is_empty() {
         return Err(ParseError::new(
             "Unclosed if block".to_string(),
+            lines.len(),
+            1,
+        ));
+    }
+    if !while_stack.is_empty() {
+        return Err(ParseError::new(
+            "Unclosed while block".to_string(),
             lines.len(),
             1,
         ));
