@@ -1,6 +1,5 @@
 # TODO
 - fix main function must be first
-- fix else if
 
 # ALL THINGS
 - public class
@@ -9,5 +8,5 @@
 - num, string, double
 - variables overwritting
 - dynamic number format on num
-- if, else statement
+- if, else if, else statement
 - system.console.println that prints to console

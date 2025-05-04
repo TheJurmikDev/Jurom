@@ -163,7 +163,7 @@ fn parse_comparison(input: &str, line: usize, column: usize) -> IResult<&str, Ex
                     parse_operand(i, line, column)
                 },
                 multispace0,
-                alt((tag("=="), tag("<"), tag(">"))),
+                alt((tag("=="), tag("!="), tag("<"), tag(">"), tag("<="), tag(">="))),
                 multispace0,
                 |i| {
                     println!("Parsing right operand: '{}'", i);
@@ -417,22 +417,21 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut stmts = Vec::new();
     let mut current_class: Option<String> = None;
     let mut current_function: Option<String> = None;
-    let mut current_if: Option<(Expr, Vec<Stmt>)> = None;
-    let mut else_if_branches: Vec<(Expr, Vec<Stmt>)> = Vec::new();
+    let mut if_stack: Vec<(Expr, Vec<Stmt>, Vec<(Expr, Vec<Stmt>)>, Vec<Stmt>, bool, bool)> = Vec::new(); // (condition, if_body, else_if_branches, else_body, in_else, in_else_if)
     let mut class_body: Vec<Stmt> = Vec::new();
     let mut function_body: Vec<Stmt> = Vec::new();
-    let mut else_body: Vec<Stmt> = Vec::new();
-    let mut in_else = false;
-    let mut block_body: Vec<Stmt> = Vec::new();
     let mut block_depth = 0;
+    let mut if_block_depth = 0;
     let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new();
 
     let lines: Vec<&str> = code.lines().collect();
+    println!("Lines in file: {:?}", lines);
     let mut line_index = 0;
 
     while line_index < lines.len() {
         let line = lines[line_index];
         let trimmed = line.trim();
+        println!("Processing line {}: '{}'", line_index + 1, line);
         if trimmed.is_empty() {
             line_index += 1;
             continue;
@@ -513,11 +512,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
 
         println!("Parsed stmt: {:?}", stmt);
         println!("Else part: {:?}", else_part);
-        println!("Current if: {:?}", current_if);
+        println!("If stack: {:?}", if_stack);
 
-        // Handle else_part first to maintain if context
+        // Handle else_part
         if let Some((ref else_type, ref condition)) = else_part {
-            if current_if.is_none() {
+            if if_stack.is_empty() {
                 return Err(ParseError::new(
                     format!("{} without matching if", else_type),
                     line_index + 1,
@@ -525,89 +524,143 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 ));
             }
             if else_type == "else if" {
-                else_if_branches.push((condition.clone(), Vec::new()));
-                block_depth += 1;
-                println!("Added else_if branch: {:?}", condition);
+                if let Some(last) = if_stack.last_mut() {
+                    last.5 = true; // in_else_if = true
+                    last.2.push((condition.clone(), Vec::new())); // Add to else_if_branches
+                    if_block_depth += 1;
+                    block_depth += 1;
+                    println!("Added else_if branch: {:?}", condition);
+                }
             } else if else_type == "else" {
-                in_else = true;
-                else_body = Vec::new();
-                block_depth += 1;
-                println!("Started else branch");
+                if let Some(last) = if_stack.last_mut() {
+                    last.4 = true; // in_else = true
+                    last.5 = false; // in_else_if = false
+                    last.3 = Vec::new(); // Reset else_body
+                    if_block_depth += 1;
+                    block_depth += 1;
+                    println!("Started else branch");
+                }
             }
         }
 
         match &stmt {
             Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK" => {
                 block_depth -= 1;
-                println!("Processing END_BLOCK, block_depth: {}", block_depth);
-                if in_else {
-                    if let Some((condition, if_body)) = current_if.take() {
-                        let else_stmt = if else_body.is_empty() {
-                            None
-                        } else {
-                            Some(Box::new(Stmt::Block(else_body)))
-                        };
-                        let if_stmt = Stmt::If {
-                            condition,
-                            body: if_body,
-                            else_if: else_if_branches,
-                            else_branch: else_stmt,
-                        };
-                        if current_function.is_some() {
-                            function_body.push(if_stmt);
-                        } else if current_class.is_some() {
-                            class_body.push(if_stmt);
-                        } else {
-                            stmts.push(if_stmt);
+                println!("Processing END_BLOCK, block_depth: {}, if_block_depth: {}", block_depth, if_block_depth);
+                if !if_stack.is_empty() {
+                    if_block_depth -= 1;
+                    if if_stack.last().map_or(false, |last| last.4 && if_block_depth <= 0) {
+                        // Finalize else branch
+                        if let Some((condition, if_body, else_if_branches, else_body, _, _)) = if_stack.pop() {
+                            let else_stmt = if else_body.is_empty() {
+                                None
+                            } else {
+                                Some(Box::new(Stmt::Block(else_body)))
+                            };
+                            let if_stmt = Stmt::If {
+                                condition,
+                                body: if_body,
+                                else_if: else_if_branches,
+                                else_branch: else_stmt,
+                            };
+                            println!("Finalized if statement: {:?}", if_stmt);
+                            if !if_stack.is_empty() {
+                                if let Some(last) = if_stack.last_mut() {
+                                    if last.4 {
+                                        last.3.push(if_stmt.clone());
+                                        println!("Added to parent else_body: {:?}", if_stmt);
+                                    } else if last.5 && !last.2.is_empty() {
+                                        if let Some(last_branch) = last.2.last_mut() {
+                                            last_branch.1.push(if_stmt.clone());
+                                            println!("Added to parent else_if body: {:?}", if_stmt);
+                                        }
+                                    } else {
+                                        last.1.push(if_stmt.clone());
+                                        println!("Added to parent if_body: {:?}", if_stmt);
+                                    }
+                                }
+                            } else if current_function.is_some() {
+                                function_body.push(if_stmt.clone());
+                                println!("Added to function_body: {:?}", if_stmt);
+                            } else if current_class.is_some() {
+                                class_body.push(if_stmt.clone());
+                                println!("Added to class_body: {:?}", if_stmt);
+                            } else {
+                                stmts.push(if_stmt.clone());
+                                println!("Added to stmts: {:?}", if_stmt);
+                            }
+                            if_block_depth = if_stack.iter().map(|_| 1).sum(); // Recalculate based on open if blocks
+                        }
+                    } else if if_stack.last().map_or(false, |last| last.5 && if_block_depth <= 0) {
+                        // Exit else_if branch
+                        if let Some(last) = if_stack.last_mut() {
+                            last.5 = false; // in_else_if = false
+                        }
+                    } else if if_block_depth >= 0 && if_stack.last().map_or(false, |last| !last.5 && !last.4) {
+                        // Finalize if branch (including nested if)
+                        if let Some((condition, if_body, else_if_branches, else_body, _, _)) = if_stack.pop() {
+                            let else_stmt = if else_body.is_empty() {
+                                None
+                            } else {
+                                Some(Box::new(Stmt::Block(else_body)))
+                            };
+                            let if_stmt = Stmt::If {
+                                condition,
+                                body: if_body,
+                                else_if: else_if_branches,
+                                else_branch: else_stmt,
+                            };
+                            println!("Finalized if statement: {:?}", if_stmt);
+                            if !if_stack.is_empty() {
+                                if let Some(last) = if_stack.last_mut() {
+                                    if last.4 {
+                                        last.3.push(if_stmt.clone());
+                                        println!("Added to parent else_body: {:?}", if_stmt);
+                                    } else if last.5 && !last.2.is_empty() {
+                                        if let Some(last_branch) = last.2.last_mut() {
+                                            last_branch.1.push(if_stmt.clone());
+                                            println!("Added to parent else_if body: {:?}", if_stmt);
+                                        }
+                                    } else {
+                                        last.1.push(if_stmt.clone());
+                                        println!("Added to parent if_body: {:?}", if_stmt);
+                                    }
+                                }
+                            } else if current_function.is_some() {
+                                function_body.push(if_stmt.clone());
+                                println!("Added to function_body: {:?}", if_stmt);
+                            } else if current_class.is_some() {
+                                class_body.push(if_stmt.clone());
+                                println!("Added to class_body: {:?}", if_stmt);
+                            } else {
+                                stmts.push(if_stmt.clone());
+                                println!("Added to stmts: {:?}", if_stmt);
+                            }
+                            if_block_depth = if_stack.iter().map(|_| 1).sum();
                         }
                     }
-                    in_else = false;
-                    else_body = Vec::new();
-                    else_if_branches = Vec::new();
-                } else if current_if.is_some() && else_part.is_none() {
-                    // Only finalize if there is no else_if or else following
-                    if let Some((condition, if_body)) = current_if.take() {
-                        let else_stmt = if else_body.is_empty() {
-                            None
-                        } else {
-                            Some(Box::new(Stmt::Block(else_body)))
-                        };
-                        let if_stmt = Stmt::If {
-                            condition,
-                            body: if_body,
-                            else_if: else_if_branches,
-                            else_branch: else_stmt,
-                        };
-                        if current_function.is_some() {
-                            function_body.push(if_stmt);
-                        } else if current_class.is_some() {
-                            class_body.push(if_stmt);
-                        } else {
-                            stmts.push(if_stmt);
-                        }
-                        else_if_branches = Vec::new();
-                        else_body = Vec::new();
+                }
+                // Handle function and class closure at block_depth == 0
+                if block_depth == 0 {
+                    if let Some(func_name) = current_function.take() {
+                        class_body.push(Stmt::FunctionDecl(func_name.clone(), function_body));
+                        function_body = Vec::new();
+                        println!("Finalized function: {}", func_name);
                     }
-                } else if let Some(func_name) = current_function.take() {
-                    class_body.push(Stmt::FunctionDecl(func_name, function_body));
-                    function_body = Vec::new();
-                } else if let Some(class_name) = current_class.take() {
-                    stmts.push(Stmt::ClassDecl(class_name, class_body));
-                    class_body = Vec::new();
+                    if let Some(class_name) = current_class.take() {
+                        stmts.push(Stmt::ClassDecl(class_name.clone(), class_body));
+                        class_body = Vec::new();
+                        println!("Finalized class: {}", class_name);
+                    }
                 }
             }
             Stmt::If { condition, .. } => {
-                if current_if.is_some() {
-                    return Err(ParseError::new(
-                        "Nested if statements are not supported".to_string(),
-                        line_index + 1,
-                        column,
-                    ));
-                }
-                current_if = Some((condition.clone(), block_body.clone()));
-                block_body = Vec::new();
+                if_stack.push((condition.clone(), Vec::new(), Vec::new(), Vec::new(), false, false));
                 block_depth += 1;
+                if_block_depth += 1;
                 println!("Started if with condition: {:?}", condition);
+                line_index += 1;
+                continue; // Skip adding this stmt to avoid duplication
             }
             Stmt::VariableDecl(_type_name, var_name, _) => {
                 if declared_variables.contains_key(var_name) {
@@ -622,29 +675,40 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             _ => {}
         }
 
-        // Přidáváme stmt do těla pouze pokud není END_BLOCK
+        // Add statements to the appropriate body
         if !matches!(&stmt, Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK") {
-            if in_else {
-                else_body.push(stmt.clone());
-            } else if !else_if_branches.is_empty() {
-                if let Some(last) = else_if_branches.last_mut() {
-                    last.1.push(stmt.clone());
+            println!("if_stack: {:?}", if_stack);
+            if !if_stack.is_empty() {
+                if let Some(last) = if_stack.last_mut() {
+                    if last.4 {
+                        last.3.push(stmt.clone());
+                        println!("Added to else_body: {:?}", stmt);
+                    } else if last.5 && !last.2.is_empty() {
+                        if let Some(last_branch) = last.2.last_mut() {
+                            last_branch.1.push(stmt.clone());
+                            println!("Added to else_if body: {:?}", stmt);
+                        }
+                    } else {
+                        last.1.push(stmt.clone());
+                        println!("Added to if_body: {:?}", stmt);
+                    }
                 }
-            } else if current_if.is_some() {
-                block_body.push(stmt.clone());
             } else if current_function.is_some() {
-                function_body.push(stmt);
+                function_body.push(stmt.clone());
+                println!("Added to function_body: {:?}", stmt);
             } else if current_class.is_some() {
-                class_body.push(stmt);
+                class_body.push(stmt.clone());
+                println!("Added to class_body: {:?}", stmt);
             } else {
-                stmts.push(stmt);
+                stmts.push(stmt.clone());
+                println!("Added to stmts: {:?}", stmt);
             }
         }
 
         line_index += 1;
     }
 
-    if current_if.is_some() {
+    if !if_stack.is_empty() {
         return Err(ParseError::new(
             "Unclosed if block".to_string(),
             lines.len(),

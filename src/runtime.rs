@@ -125,8 +125,11 @@ impl Runtime {
                         let result = match (left_num, right_num) {
                             (Number::Integer(l), Number::Integer(r)) => match op.as_str() {
                                 "==" => l == r,
+                                "!=" => l != r,
                                 "<" => l < r,
                                 ">" => l > r,
+                                "<=" => l <= r,
+                                ">=" => l >= r,
                                 _ => {
                                     return Err(ParseError::new(
                                         format!("Unknown comparison operator: {}", op),
@@ -139,8 +142,11 @@ impl Runtime {
                                 const EPSILON: f64 = 1e-10;
                                 match op.as_str() {
                                     "==" => (l - r).abs() < EPSILON,
+                                    "!=" => (l - r).abs() >= EPSILON,
                                     "<" => l < r - EPSILON,
                                     ">" => l > r + EPSILON,
+                                    "<=" => l <= r + EPSILON,
+                                    ">=" => l >= r - EPSILON,
                                     _ => {
                                         return Err(ParseError::new(
                                             format!("Unknown comparison operator: {}", op),
@@ -154,8 +160,11 @@ impl Runtime {
                                 const EPSILON: f64 = 1e-10;
                                 match op.as_str() {
                                     "==" => ((l as f64) - r).abs() < EPSILON,
+                                    "!=" => ((l as f64) - r).abs() >= EPSILON,
                                     "<" => (l as f64) < r - EPSILON,
                                     ">" => (l as f64) > r + EPSILON,
+                                    "<=" => (l as f64) <= r + EPSILON,
+                                    ">=" => (l as f64) >= r - EPSILON,
                                     _ => {
                                         return Err(ParseError::new(
                                             format!("Unknown comparison operator: {}", op),
@@ -169,8 +178,11 @@ impl Runtime {
                                 const EPSILON: f64 = 1e-10;
                                 match op.as_str() {
                                     "==" => (l - (r as f64)).abs() < EPSILON,
+                                    "!=" => (l - (r as f64)).abs() >= EPSILON,
                                     "<" => l < (r as f64) - EPSILON,
                                     ">" => l > (r as f64) + EPSILON,
+                                    "<=" => l <= (r as f64) + EPSILON,
+                                    ">=" => l >= (r as f64) - EPSILON,
                                     _ => {
                                         return Err(ParseError::new(
                                             format!("Unknown comparison operator: {}", op),
@@ -281,7 +293,9 @@ impl Runtime {
         else_branch: &Option<Box<Stmt>>,
     ) -> Result<(), ParseError> {
         let condition_value = self.evaluate_expr(condition)?;
+        println!("Evaluated if condition: {:?} -> {:?}", condition, condition_value);
         if let Value::Boolean(true) = condition_value {
+            println!("Executing if body: {:?}", body);
             for stmt in body {
                 match stmt {
                     Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
@@ -317,7 +331,9 @@ impl Runtime {
             let mut executed = false;
             for (else_if_condition, else_if_body) in else_if_branches {
                 let else_if_value = self.evaluate_expr(else_if_condition)?;
+                println!("Evaluated else_if condition: {:?} -> {:?}", else_if_condition, else_if_value);
                 if let Value::Boolean(true) = else_if_value {
+                    println!("Executing else_if body: {:?}", else_if_body);
                     for stmt in else_if_body {
                         match stmt {
                             Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
@@ -355,6 +371,7 @@ impl Runtime {
             }
             if !executed {
                 if let Some(else_stmt) = else_branch {
+                    println!("Executing else branch: {:?}", else_stmt);
                     match &**else_stmt {
                         Stmt::Block(stmts) => {
                             for stmt in stmts {
