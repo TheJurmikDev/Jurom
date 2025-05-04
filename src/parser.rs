@@ -153,25 +153,21 @@ fn parse_binary_op(input: &str, line: usize, column: usize) -> IResult<&str, Exp
 }
 
 fn parse_comparison(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    println!("Parsing comparison: '{}'", input);
     context(
         "comparison operation",
         map(
             tuple((
                 |i| {
-                    println!("Parsing left operand: '{}'", i);
                     parse_operand(i, line, column)
                 },
                 multispace0,
                 alt((tag("=="), tag("!="), tag("<="), tag(">="), tag("<"), tag(">"))),
                 multispace0,
                 |i| {
-                    println!("Parsing right operand: '{}'", i);
                     parse_operand(i, line, column)
                 },
             )),
             |(left, _, op, _, right)| {
-                println!("Parsed comparison: {:?} {} {:?}", left, op, right);
                 Expr::Comparison(Box::new(left), op.to_string(), Box::new(right), line, column)
             },
         ),
@@ -215,14 +211,12 @@ fn parse_expression(input: &str, line: usize, column: usize) -> IResult<&str, Ex
 }
 
 fn parse_println(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    println!("Parsing println: '{}'", input);
     context(
         "println",
         map(
             tuple((
                 tag("system.console.println("),
                 |i| {
-                    println!("Parsing println expression: '{}'", i);
                     parse_expression(i, line, column)
                 },
                 tag(")"),
@@ -294,7 +288,6 @@ fn parse_function_call(input: &str, line: usize, column: usize) -> IResult<&str,
 }
 
 fn parse_block(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
-    println!("Parsing block start: '{}'", input);
     context(
         "block",
         map(
@@ -305,7 +298,6 @@ fn parse_block(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
 }
 
 fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    println!("Parsing if: '{}'", input);
     context(
         "if statement",
         map(
@@ -313,7 +305,6 @@ fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
                 tag("if"),
                 multispace0,
                 |i| {
-                    println!("Parsing condition: '{}'", i);
                     parse_condition_in_parens(i, line, column)
                 },
                 multispace0,
@@ -325,7 +316,6 @@ fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
 }
 
 fn parse_else_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    println!("Parsing else if: '{}'", input);
     context(
         "else if statement",
         map(
@@ -349,7 +339,6 @@ fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str
             code: ErrorKind::Fail,
         }));
     }
-    println!("Parsing line: '{}'", trimmed);
     context(
         "line",
         alt((
@@ -358,7 +347,6 @@ fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str
                     |i| parse_if(i, line, column),
                     opt(|i: &'a str| {
                         let (rest, _) = multispace0(i)?;
-                        println!("Checking for else after if: '{}'", rest);
                         alt((
                             map(
                                 |i| parse_else_if(i, line, column),
@@ -390,7 +378,6 @@ fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str
                     tag("}"),
                     opt(|i: &'a str| {
                         let (rest, _) = multispace0(i)?;
-                        println!("Checking for else after }}: '{}'", rest);
                         alt((
                             map(
                                 |i| parse_else_if(i, line, column),
@@ -425,13 +412,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new();
 
     let lines: Vec<&str> = code.lines().collect();
-    println!("Lines in file: {:?}", lines);
     let mut line_index = 0;
 
     while line_index < lines.len() {
         let line = lines[line_index];
         let trimmed = line.trim();
-        println!("Processing line {}: '{}'", line_index + 1, line);
         if trimmed.is_empty() {
             line_index += 1;
             continue;
@@ -510,10 +495,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             ));
         }
 
-        println!("Parsed stmt: {:?}", stmt);
-        println!("Else part: {:?}", else_part);
-        println!("If stack: {:?}", if_stack);
-
         if let Some((ref else_type, ref condition)) = else_part {
             if if_stack.is_empty() {
                 return Err(ParseError::new(
@@ -528,7 +509,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                     last.2.push((condition.clone(), Vec::new()));
                     if_block_depth += 1;
                     block_depth += 1;
-                    println!("Added else_if branch: {:?}", condition);
                 }
             } else if else_type == "else" {
                 if let Some(last) = if_stack.last_mut() {
@@ -537,7 +517,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                     last.3 = Vec::new();
                     if_block_depth += 1;
                     block_depth += 1;
-                    println!("Started else branch");
                 }
             }
         }
@@ -545,7 +524,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         match &stmt {
             Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK" => {
                 block_depth -= 1;
-                println!("Processing END_BLOCK, block_depth: {}, if_block_depth: {}", block_depth, if_block_depth);
                 if !if_stack.is_empty() {
                     if_block_depth -= 1;
                     if if_stack.last().map_or(false, |last| last.4 && if_block_depth <= 0) {
@@ -561,31 +539,24 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                                 else_if: else_if_branches,
                                 else_branch: else_stmt,
                             };
-                            println!("Finalized if statement: {:?}", if_stmt);
                             if !if_stack.is_empty() {
                                 if let Some(last) = if_stack.last_mut() {
                                     if last.4 {
                                         last.3.push(if_stmt.clone());
-                                        println!("Added to parent else_body: {:?}", if_stmt);
                                     } else if last.5 && !last.2.is_empty() {
                                         if let Some(last_branch) = last.2.last_mut() {
                                             last_branch.1.push(if_stmt.clone());
-                                            println!("Added to parent else_if body: {:?}", if_stmt);
                                         }
                                     } else {
                                         last.1.push(if_stmt.clone());
-                                        println!("Added to parent if_body: {:?}", if_stmt);
                                     }
                                 }
                             } else if current_function.is_some() {
                                 function_body.push(if_stmt.clone());
-                                println!("Added to function_body: {:?}", if_stmt);
                             } else if current_class.is_some() {
                                 class_body.push(if_stmt.clone());
-                                println!("Added to class_body: {:?}", if_stmt);
                             } else {
                                 stmts.push(if_stmt.clone());
-                                println!("Added to stmts: {:?}", if_stmt);
                             }
                             if_block_depth = if_stack.iter().map(|_| 1).sum();
                         }
@@ -606,31 +577,24 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                                 else_if: else_if_branches,
                                 else_branch: else_stmt,
                             };
-                            println!("Finalized if statement: {:?}", if_stmt);
                             if !if_stack.is_empty() {
                                 if let Some(last) = if_stack.last_mut() {
                                     if last.4 {
                                         last.3.push(if_stmt.clone());
-                                        println!("Added to parent else_body: {:?}", if_stmt);
                                     } else if last.5 && !last.2.is_empty() {
                                         if let Some(last_branch) = last.2.last_mut() {
                                             last_branch.1.push(if_stmt.clone());
-                                            println!("Added to parent else_if body: {:?}", if_stmt);
                                         }
                                     } else {
                                         last.1.push(if_stmt.clone());
-                                        println!("Added to parent if_body: {:?}", if_stmt);
                                     }
                                 }
                             } else if current_function.is_some() {
                                 function_body.push(if_stmt.clone());
-                                println!("Added to function_body: {:?}", if_stmt);
                             } else if current_class.is_some() {
                                 class_body.push(if_stmt.clone());
-                                println!("Added to class_body: {:?}", if_stmt);
                             } else {
                                 stmts.push(if_stmt.clone());
-                                println!("Added to stmts: {:?}", if_stmt);
                             }
                             if_block_depth = if_stack.iter().map(|_| 1).sum();
                         }
@@ -640,12 +604,10 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                     if let Some(func_name) = current_function.take() {
                         class_body.push(Stmt::FunctionDecl(func_name.clone(), function_body));
                         function_body = Vec::new();
-                        println!("Finalized function: {}", func_name);
                     }
                     if let Some(class_name) = current_class.take() {
                         stmts.push(Stmt::ClassDecl(class_name.clone(), class_body));
                         class_body = Vec::new();
-                        println!("Finalized class: {}", class_name);
                     }
                 }
             }
@@ -653,7 +615,6 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 if_stack.push((condition.clone(), Vec::new(), Vec::new(), Vec::new(), false, false));
                 block_depth += 1;
                 if_block_depth += 1;
-                println!("Started if with condition: {:?}", condition);
                 line_index += 1;
                 continue;
             }
@@ -680,31 +641,24 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         }
 
         if !matches!(&stmt, Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK") {
-            println!("if_stack: {:?}", if_stack);
             if !if_stack.is_empty() {
                 if let Some(last) = if_stack.last_mut() {
                     if last.4 {
                         last.3.push(stmt.clone());
-                        println!("Added to else_body: {:?}", stmt);
                     } else if last.5 && !last.2.is_empty() {
                         if let Some(last_branch) = last.2.last_mut() {
                             last_branch.1.push(stmt.clone());
-                            println!("Added to else_if body: {:?}", stmt);
                         }
                     } else {
                         last.1.push(stmt.clone());
-                        println!("Added to if_body: {:?}", stmt);
                     }
                 }
             } else if current_function.is_some() {
                 function_body.push(stmt.clone());
-                println!("Added to function_body: {:?}", stmt);
             } else if current_class.is_some() {
                 class_body.push(stmt.clone());
-                println!("Added to class_body: {:?}", stmt);
             } else {
                 stmts.push(stmt.clone());
-                println!("Added to stmts: {:?}", stmt);
             }
         }
 
