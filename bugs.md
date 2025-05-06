@@ -84,22 +84,6 @@ Test While with If
 - Likely caused by incorrect variable scoping or comparison logic in `evaluate_expr`.
 - Planned fix in a future release (tracked in [TODO List](readme.md#-todo-list)).
 
-### 2. `main` Function Must Be the First Function in the Class
-**Status**: Open  
-**Description**: The Jurom compiler requires the `main` function to be the first function declared in the `public class`. If another function is declared before `main`, the compiler may fail to find or execute `main`, resulting in an error or unexpected behavior. This limitation restricts program structure and is not ideal for flexibility.
-
-**Example**:
-```java
-public class main {
-  function other() {
-    system.console.println("This is another function");
-  }
-  function main() {
-    system.console.println("This is main");
-  }
-}
-```
-
 ## 🆕 Reporting New Bugs
 Found a bug we don’t know about? 🙀 Please report it:
 1. Check if the bug is already listed here or in the [Issues](https://github.com/TheJurmikDev/Jurom-language/issues) page.

@@ -112,12 +112,11 @@ Every Jurom program needs few things.
 ## 🔮 TODO List
 We’re working on making Jurom even better! Here’s what’s planned:
 - 🐛 Fix `if` statements inside `while` loops (currently not working as expected).
-- 📌 Allow `main` function to be anywhere in the code, not just first.
 - ➕ Add new operators like modulo (`%`) and power (`**`).
 - ⌨️ Support reading user input from the console.
 - 📋 Add arrays or lists for storing multiple values.
 - 🛞 Add break function for while loops.
-- ➖ Add math operations like `-`.
+- 📌 Add math operations like `-`.
 - 💎 Add `break` function for while loop.
 - 💬 Include comments (e.g., `//` for single-line comments).
 - 📢 Improve error messages to be clearer and more helpful.
