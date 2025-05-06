@@ -122,7 +122,7 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Integer(l * r))),
                             "/" => {
                                 if r == 0 {
-                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
                                 } else {
                                     let result = l / r;
                                     if result >= i64::MIN && result <= i64::MAX && result % 1 == 0 {
@@ -139,7 +139,7 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Float(l * r))),
                             "/" => {
                                 if r == 0.0 {
-                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
                                 } else {
                                     Ok(Value::Number(Number::Float(l / r)))
                                 }
@@ -151,7 +151,7 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Float(l as f64 * r))),
                             "/" => {
                                 if r == 0.0 {
-                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
                                 } else {
                                     Ok(Value::Number(Number::Float(l as f64 / r)))
                                 }
@@ -163,7 +163,7 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Float(l * r as f64))),
                             "/" => {
                                 if r == 0 {
-                                    Err(ParseError::new("Dělení nulou".to_string(), *line, *column))
+                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
                                 } else {
                                     Ok(Value::Number(Number::Float(l / r as f64)))
                                 }
