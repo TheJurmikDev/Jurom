@@ -11,8 +11,7 @@ Jurom is a simple programming language built for learning and fun! It uses easy 
 - ✅ **Conditionals**: Use `if`, `else if`, and `else` for decision-making.
 - 🔁 **Loops**: Write `while` loops to repeat actions.
 - 🖨️ **Console Output**: Print text, numbers, or booleans with `system.console.println`.
-- 🧮 **Operators**: Supports `+`, `-`, `*`, `/`, `=`, `<`, `>`, `<=`, `>=`.
-- 🚪 **Break Statement**: Exit loops early with `break`.
+- 🧮 **Operators**: Supports `+`, `*`, `/`, `=`, `<`, `>`, `<=`, `>=`, `!=`.
 
 ## 🛠️ Installation
 To start using Jurom, you need [Rust](https://www.rust-lang.org/) installed. Follow these steps:
@@ -117,6 +116,9 @@ We’re working on making Jurom even better! Here’s what’s planned:
 - ➕ Add new operators like modulo (`%`) and power (`**`).
 - ⌨️ Support reading user input from the console.
 - 📋 Add arrays or lists for storing multiple values.
+- 🛞 Add break function for while loops.
+- ➖ Add math operations like `-`.
+- 💎 Add `break` function for while loop.
 - 💬 Include comments (e.g., `//` for single-line comments).
 - 📢 Improve error messages to be clearer and more helpful.
 - ⚡ Optimize the compiler for faster program execution.
