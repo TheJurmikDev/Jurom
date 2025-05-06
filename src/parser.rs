@@ -466,12 +466,8 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             block_depth += 1;
             line_index += 1;
             continue;
-        } else if trimmed.starts_with("function") {
-            let func_name = trimmed
-                .replace("function", "")
-                .replace("() {", "")
-                .trim()
-                .to_string();
+        }
+        else if trimmed.starts_with("function") {
             if current_function.is_some() {
                 return Err(ParseError::new(
                     "Nested functions are not supported".to_string(),
@@ -479,6 +475,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                     column,
                 ));
             }
+            let func_name = trimmed
+                .replace("function", "")
+                .replace("() {", "")
+                .trim()
+                .to_string();
             current_function = Some(func_name);
             function_body = Vec::new();
             declared_variables.clear();
@@ -654,14 +655,18 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                         }
                     }
                 }
-                if block_depth == 0 {
+
+                if current_function.is_some() && block_depth == 1 {
                     if let Some(func_name) = current_function.take() {
-                        class_body.push(Stmt::FunctionDecl(func_name.clone(), function_body));
+                        class_body.push(Stmt::FunctionDecl(func_name.clone(), function_body.clone()));
                         function_body = Vec::new();
+                        declared_variables.clear();
                     }
+                } else if current_class.is_some() && block_depth == 0 {
                     if let Some(class_name) = current_class.take() {
-                        stmts.push(Stmt::ClassDecl(class_name.clone(), class_body));
+                        stmts.push(Stmt::ClassDecl(class_name.clone(), class_body.clone()));
                         class_body = Vec::new();
+                        declared_variables.clear();
                     }
                 }
             }
@@ -744,12 +749,17 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             1,
         ));
     }
-    if current_function.is_some() || current_class.is_some() {
+    if current_function.is_some() {
         return Err(ParseError::new(
-            "Unclosed class or function block".to_string(),
+            "Unclosed function block".to_string(),
             lines.len(),
             1,
         ));
+    }
+    if current_class.is_some() {
+        if let Some(class_name) = current_class.take() {
+            stmts.push(Stmt::ClassDecl(class_name, class_body));
+        }
     }
     if block_depth != 0 {
         return Err(ParseError::new(
