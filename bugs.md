@@ -1,6 +1,6 @@
 # 🐛 Jurom Language Known Bugs
 
-Welcome to the Jurom Language bug tracker! This file lists all known bugs in the Jurom programming language, along with descriptions, examples, and workarounds (if available). Jurom is a simple language built for learning and fun, and we’re working hard to fix these issues to make it even better! Your help in reporting or fixing bugs is greatly appreciated.
+Welcome to the Jurom Language bug tracker! This file lists all known bugs in the Jurom programming language, along with descriptions, examples, and workarounds (if available). Jurom is a simple language built for learning and fun, and we’re working hard to fix these issues to make it even better! Your help in reporting is greatly appreciated.
 
 ## 📋 How to Use This File
 - **Bug Entries**: Each bug has a title, description, example (if applicable), and workaround (if known).
