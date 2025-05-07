@@ -107,7 +107,7 @@ This project has been started since 2025 May.
 
 Every Jurom program needs few things.
 - `public class` that’s on the start of file.
-- `function main` that’s first function under class.
+- `function main` that’s function under class that’s automatically started.
 
 ## 🔮 TODO List
 We’re working on making Jurom even better! Here’s what’s planned:
