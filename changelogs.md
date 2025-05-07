@@ -10,6 +10,13 @@ Welcome to the Jurom Language changelog! This file tracks all the updates, bug f
     - 🔧 **Changed**: Improvements or updates to existing features.
     - 🗑️ **Removed**: Features or code that were removed.
 
+## [0.1.1] - 2025-05-07
+Small changes I forgot to add and small fixes.
+
+### 🆕 Added
+- Moved parser functions to parser folder
+- Added new arithmetic operator: `-`.
+
 ## [0.1.0] - 2025-05-01
 Initial release of Jurom Language! 🎉 This version introduces the core features of the language, providing a foundation for learning and experimentation.
 

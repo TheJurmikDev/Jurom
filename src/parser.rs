@@ -2,16 +2,29 @@ use std::collections::HashMap;
 use std::fmt;
 use colored::*;
 use nom::{
-    IResult,
-    bytes::complete::{tag, take_until},
-    sequence::delimited,
-    character::complete::{alphanumeric1, multispace0, one_of},
-    branch::alt,
-    combinator::{map, opt},
-    sequence::tuple,
-    number::complete::double,
-    error::{context, Error, ErrorKind},
+    error::{ErrorKind},
 };
+use crate::parser::parse_line::parse_line;
+
+mod parse_line;
+mod parse_string;
+mod parse_number;
+mod parse_boolean;
+mod parse_variable;
+mod parse_operand;
+mod parse_binary_op;
+mod parse_comparison;
+mod parse_if_condition;
+mod parse_condition_in_parens;
+mod parse_expresion;
+mod parse_println;
+mod parse_variable_decl;
+mod parse_function_call;
+mod parse_assignment;
+mod parse_block;
+mod parse_while;
+mod parse_else_if;
+mod parse_if;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
@@ -88,337 +101,6 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} at line {}, column {}", self.message, self.line, self.column)
     }
-}
-
-fn parse_string(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "string literal",
-        map(
-            delimited(tag("\""), take_until("\""), tag("\"")),
-            |s: &str| Expr::Literal(Literal::String(s.to_string()), line, column),
-        ),
-    )(input)
-}
-
-fn parse_number(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "number literal",
-        map(double, |n: f64| Expr::Literal(Literal::Number(n), line, column)),
-    )(input)
-}
-
-fn parse_boolean(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "boolean literal",
-        alt((
-            map(tag("true"), |_| Expr::Literal(Literal::Boolean(true), line, column)),
-            map(tag("false"), |_| Expr::Literal(Literal::Boolean(false), line, column)),
-        )),
-    )(input)
-}
-
-fn parse_variable(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "variable",
-        map(alphanumeric1, |name: &str| Expr::Variable(name.to_string(), line, column)),
-    )(input)
-}
-
-fn parse_operand(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "operand",
-        alt((
-            |i| parse_number(i, line, column),
-            |i| parse_boolean(i, line, column),
-            |i| parse_variable(i, line, column),
-        )),
-    )(input)
-}
-
-fn parse_binary_op(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "binary operation",
-        map(
-            tuple((
-                |i| parse_operand(i, line, column),
-                multispace0,
-                one_of("+*/"),
-                multispace0,
-                |i| parse_operand(i, line, column),
-            )),
-            |(left, _, op, _, right)| {
-                Expr::BinaryOp(Box::new(left), op.to_string(), Box::new(right), line, column)
-            },
-        ),
-    )(input)
-}
-
-fn parse_comparison(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "comparison operation",
-        map(
-            tuple((
-                |i| {
-                    parse_operand(i, line, column)
-                },
-                multispace0,
-                alt((tag("=="), tag("!="), tag("<="), tag(">="), tag("<"), tag(">"))),
-                multispace0,
-                |i| {
-                    parse_operand(i, line, column)
-                },
-            )),
-            |(left, _, op, _, right)| {
-                Expr::Comparison(Box::new(left), op.to_string(), Box::new(right), line, column)
-            },
-        ),
-    )(input)
-}
-
-fn parse_if_condition(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "if condition",
-        alt((
-            |i| parse_comparison(i, line, column),
-            |i| parse_boolean(i, line, column),
-            |i| parse_variable(i, line, column),
-        )),
-    )(input)
-}
-
-fn parse_condition_in_parens(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "condition in parentheses",
-        delimited(
-            tuple((multispace0, tag("("), multispace0)),
-            |i| parse_if_condition(i, line, column),
-            tuple((multispace0, tag(")"), multispace0)),
-        ),
-    )(input)
-}
-
-fn parse_expression(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "expression",
-        alt((
-            |i| parse_comparison(i, line, column),
-            |i| parse_binary_op(i, line, column),
-            |i| parse_string(i, line, column),
-            |i| parse_number(i, line, column),
-            |i| parse_boolean(i, line, column),
-            |i| parse_variable(i, line, column),
-        )),
-    )(input)
-}
-
-fn parse_println(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "println",
-        map(
-            tuple((
-                tag("system.console.println("),
-                |i| {
-                    parse_expression(i, line, column)
-                },
-                tag(")"),
-                opt(tag(";")),
-            )),
-            |(_, content, _, _)| Expr::FunctionCall {
-                name: "println".to_string(),
-                args: vec![content],
-                line,
-                column,
-            },
-        ),
-    )(input)
-}
-
-fn parse_variable_decl(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
-    context(
-        "variable declaration",
-        map(
-            tuple((
-                alt((tag("num"), tag("string"), tag("boolean"))),
-                multispace0,
-                alphanumeric1,
-                multispace0,
-                tag("="),
-                multispace0,
-                |i| parse_expression(i, line, column),
-                multispace0,
-                tag(";"),
-            )),
-            |(type_name, _, var_name, _, _, _, value, _, _)| {
-                Stmt::VariableDecl(type_name.to_string(), var_name.to_string(), value)
-            },
-        ),
-    )(input)
-}
-
-fn parse_assignment(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
-    context(
-        "assignment",
-        map(
-            tuple((
-                alphanumeric1,
-                multispace0,
-                tag("="),
-                multispace0,
-                |i| parse_expression(i, line, column),
-                multispace0,
-                tag(";"),
-            )),
-            |(var_name, _, _, _, value, _, _)| Stmt::Assignment(var_name.to_string(), value),
-        ),
-    )(input)
-}
-
-fn parse_function_call(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "function call",
-        map(
-            tuple((take_until("();"), tag("();"))),
-            |(name, _): (&str, &str)| Expr::FunctionCall {
-                name: name.trim().to_string(),
-                args: vec![],
-                line,
-                column,
-            },
-        ),
-    )(input)
-}
-
-fn parse_block(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
-    context(
-        "block",
-        map(
-            tuple((multispace0, tag("{"), multispace0)),
-            |_| (),
-        ),
-    )(input)
-}
-
-fn parse_while(input: &str, line: usize, column: usize) -> IResult<&str, Stmt> {
-    context(
-        "while statement",
-        map(
-            tuple((
-                tag("while"),
-                multispace0,
-                |i| parse_condition_in_parens(i, line, column),
-                multispace0,
-                |i| parse_block(i, line, column),
-            )),
-            |(_, _, condition, _, _)| Stmt::While {
-                condition,
-                body: Vec::new(),
-            },
-        ),
-    )(input)
-}
-
-fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "if statement",
-        map(
-            tuple((
-                tag("if"),
-                multispace0,
-                |i| {
-                    parse_condition_in_parens(i, line, column)
-                },
-                multispace0,
-                |i| parse_block(i, line, column),
-            )),
-            |(_, _, condition, _, _)| condition,
-        ),
-    )(input)
-}
-
-fn parse_else_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context(
-        "else if statement",
-        map(
-            tuple((
-                tag("else if"),
-                multispace0,
-                |i| parse_condition_in_parens(i, line, column),
-                multispace0,
-                |i| parse_block(i, line, column),
-            )),
-            |(_, _, condition, _, _)| condition,
-        ),
-    )(input)
-}
-
-fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str, (Stmt, Option<(String, Expr)>)> {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return Err(nom::Err::Error(Error {
-            input: trimmed,
-            code: ErrorKind::Fail,
-        }));
-    }
-    context(
-        "line",
-        alt((
-            map(
-                tuple((
-                    |i| parse_if(i, line, column),
-                    opt(|i: &'a str| {
-                        let (rest, _) = multispace0(i)?;
-                        alt((
-                            map(
-                                |i| parse_else_if(i, line, column),
-                                |cond| ("else if".to_string(), cond),
-                            ),
-                            map(
-                                tag("else {"),
-                                |_| ("else".to_string(), Expr::Literal(Literal::Boolean(true), line, column)),
-                            ),
-                        ))(rest)
-                    }),
-                )),
-                |(condition, else_part)| (
-                    Stmt::If {
-                        condition,
-                        body: vec![],
-                        else_if: vec![],
-                        else_branch: None,
-                    },
-                    else_part,
-                ),
-            ),
-            map(|i| parse_assignment(i, line, column), |stmt| (stmt, None)),
-            map(|i| parse_variable_decl(i, line, column), |stmt| (stmt, None)),
-            map(|i| parse_println(i, line, column), |expr| (Stmt::Expr(expr), None)),
-            map(|i| parse_function_call(i, line, column), |expr| (Stmt::Expr(expr), None)),
-            map(|i| parse_while(i, line, column), |stmt| (stmt, None)),
-            map(
-                tuple((
-                    tag("}"),
-                    opt(|i: &'a str| {
-                        let (rest, _) = multispace0(i)?;
-                        alt((
-                            map(
-                                |i| parse_else_if(i, line, column),
-                                |cond| ("else if".to_string(), cond),
-                            ),
-                            map(
-                                tag("else {"),
-                                |_| ("else".to_string(), Expr::Literal(Literal::Boolean(true), line, column)),
-                            ),
-                        ))(rest)
-                    }),
-                )),
-                |(_, else_part)| (
-                    Stmt::Expr(Expr::Literal(Literal::String("END_BLOCK".to_string()), line, column)),
-                    else_part,
-                ),
-            ),
-            map(tag("main();"), |_| (Stmt::FunctionCall("main".to_string()), None)),
-        )),
-    )(trimmed)
 }
 
 pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
@@ -575,6 +257,10 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                                         last.1.push(if_stmt.clone());
                                     }
                                 }
+                            } else if !while_stack.is_empty() {
+                                if let Some(last) = while_stack.last_mut() {
+                                    last.1.push(if_stmt.clone());
+                                }
                             } else if current_function.is_some() {
                                 function_body.push(if_stmt.clone());
                             } else if current_class.is_some() {
@@ -612,6 +298,10 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                                     } else {
                                         last.1.push(if_stmt.clone());
                                     }
+                                }
+                            } else if !while_stack.is_empty() {
+                                if let Some(last) = while_stack.last_mut() {
+                                    last.1.push(if_stmt.clone());
                                 }
                             } else if current_function.is_some() {
                                 function_body.push(if_stmt.clone());

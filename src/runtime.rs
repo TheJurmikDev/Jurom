@@ -119,6 +119,7 @@ impl Runtime {
                     (Value::Number(left_num), Value::Number(right_num)) => match (left_num, right_num) {
                         (Number::Integer(l), Number::Integer(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Integer(l + r))),
+                            "-" => Ok(Value::Number(Number::Integer(l - r))),
                             "*" => Ok(Value::Number(Number::Integer(l * r))),
                             "/" => {
                                 if r == 0 {
@@ -136,6 +137,7 @@ impl Runtime {
                         },
                         (Number::Float(l), Number::Float(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Float(l + r))),
+                            "-" => Ok(Value::Number(Number::Float(l - r))),
                             "*" => Ok(Value::Number(Number::Float(l * r))),
                             "/" => {
                                 if r == 0.0 {
@@ -148,6 +150,7 @@ impl Runtime {
                         },
                         (Number::Integer(l), Number::Float(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Float(l as f64 + r))),
+                            "-" => Ok(Value::Number(Number::Float(l as f64 - r))),
                             "*" => Ok(Value::Number(Number::Float(l as f64 * r))),
                             "/" => {
                                 if r == 0.0 {
@@ -160,6 +163,7 @@ impl Runtime {
                         },
                         (Number::Float(l), Number::Integer(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Float(l + r as f64))),
+                            "-" => Ok(Value::Number(Number::Float(l - r as f64))),
                             "*" => Ok(Value::Number(Number::Float(l * r as f64))),
                             "/" => {
                                 if r == 0 {
@@ -441,6 +445,9 @@ impl Runtime {
                             } => {
                                 self.execute_if(condition, body, else_if, else_branch)?;
                             }
+                            Stmt::While { condition, body } => {
+                                self.execute_while(condition, body)?;
+                            }
                             _ => {}
                         }
                     }
@@ -486,6 +493,9 @@ impl Runtime {
                                         else_branch,
                                     } => {
                                         self.execute_if(condition, body, else_if, else_branch)?;
+                                    }
+                                    Stmt::While { condition, body } => {
+                                        self.execute_while(condition, body)?;
                                     }
                                     _ => {}
                                 }
