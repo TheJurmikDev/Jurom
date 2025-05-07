@@ -108,9 +108,12 @@ impl Runtime {
             }
             Expr::Literal(Literal::Boolean(b), _line, _column) => Ok(Value::Boolean(*b)),
             Expr::Variable(name, line, column) => {
-                self.get_variable(name)
-                    .cloned()
-                    .ok_or_else(|| ParseError::new(format!("Variable {} not found", name), *line, *column))
+                for scope in self.variable_scopes.iter().rev() {
+                    if let Some(value) = scope.get(name) {
+                        return Ok(value.clone());
+                    }
+                }
+                Err(ParseError::new(format!("Variable {} not found", name), *line, *column))
             }
             Expr::BinaryOp(left, op, right, line, column) => {
                 let left_val = self.evaluate_expr(left)?;
@@ -292,7 +295,7 @@ impl Runtime {
             if let Some(expr) = args.get(0) {
                 let value = self.evaluate_expr(expr)?;
                 match value {
-                    Value::String(s) => println!("{}", s),
+                    Value::String(s) => println!("{}", s.replace("\\n", "\n")),
                     Value::Number(Number::Integer(n)) => println!("{}", n),
                     Value::Number(Number::Float(n)) => {
                         let temp = format!("{:.10}", n);

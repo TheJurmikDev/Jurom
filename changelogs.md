@@ -14,8 +14,10 @@ Welcome to the Jurom Language changelog! This file tracks all the updates, bug f
 Small changes I forgot to add and small fixes.
 
 ### 🆕 Added
-- Moved parser functions to parser folder
+- Moved parser functions to parser folder.
 - Added new arithmetic operator: `-`.
+- Better variable finder in scope.
+- Added /n sequence support for println.
 
 ## [0.1.0] - 2025-05-01
 Initial release of Jurom Language! 🎉 This version introduces the core features of the language, providing a foundation for learning and experimentation.
