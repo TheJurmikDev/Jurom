@@ -116,7 +116,6 @@ We’re working on making Jurom even better! Here’s what’s planned:
 - ⌨️ Support reading user input from the console.
 - 📋 Add arrays or lists for storing multiple values.
 - 🛞 Add break function for while loops.
-- 📌 Add math operations like `-`.
 - 💎 Add `break` function for while loop.
 - 💬 Include comments (e.g., `//` for single-line comments).
 - 📢 Improve error messages to be clearer and more helpful.
