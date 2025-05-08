@@ -12,7 +12,6 @@ mod parse_number;
 mod parse_boolean;
 mod parse_variable;
 mod parse_operand;
-mod parse_binary_op;
 mod parse_comparison;
 mod parse_if_condition;
 mod parse_condition_in_parens;
