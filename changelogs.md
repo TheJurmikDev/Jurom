@@ -16,6 +16,7 @@ Another small update with some features.
 ### 🆕 Added
 - Support for multiple strings in string variable.
 - Support for adding different variables to string. 
+- Better error handling.
 
 ## [0.1.1] - 2025-05-07
 Small changes I forgot to add and small fixes.
