@@ -87,9 +87,11 @@ impl ParseError {
         );
         if self.line > 0 && self.line <= lines.len() {
             let line_content = lines[self.line - 1];
-            eprintln!("{} {}: {}", "┃".bright_red(), "Code".bright_red(), line_content);
-            let padding = " ".repeat(self.column.saturating_sub(1));
-            eprintln!("{}       {}^", "┃".bright_red(), padding);
+            let trimmed_content = line_content.trim_start();
+            let leading_spaces = line_content.len() - trimmed_content.len();
+            eprintln!("{} {}: {}", "┃".bright_red(), "Code".bright_red(), trimmed_content);
+            let padding = " ".repeat(self.column.saturating_sub(1 + leading_spaces));
+            eprintln!("{}       {}^", "┃".bright_red(), padding.bright_red());
         }
         eprintln!("{}", "┃".bright_red());
     }
