@@ -12,7 +12,6 @@ use crate::parser::parse_function_call::parse_function_call;
 use crate::parser::parse_if::parse_if;
 use crate::parser::parse_println::parse_println;
 use crate::parser::parse_variable_decl::parse_variable_decl;
-use crate::parser::parse_while::parse_while;
 
 pub fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a str, (Stmt, Option<(String, Expr)>)> {
     let trimmed = input.trim();
@@ -56,7 +55,6 @@ pub fn parse_line<'a>(input: &'a str, line: usize, column: usize) -> IResult<&'a
             map(|i| parse_variable_decl(i, line, column), |stmt| (stmt, None)),
             map(|i| parse_println(i, line, column), |expr| (Stmt::Expr(expr), None)),
             map(|i| parse_function_call(i, line, column), |expr| (Stmt::Expr(expr), None)),
-            map(|i| parse_while(i, line, column), |stmt| (stmt, None)),
             map(
                 tuple((
                     tag("}"),

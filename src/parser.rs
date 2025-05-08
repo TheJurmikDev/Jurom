@@ -21,7 +21,6 @@ mod parse_variable_decl;
 mod parse_function_call;
 mod parse_assignment;
 mod parse_block;
-mod parse_while;
 mod parse_else_if;
 mod parse_if;
 
@@ -72,7 +71,6 @@ impl ParseError {
 
     pub fn print(&self, code: &str) {
         let lines: Vec<&str> = code.lines().collect();
-
         eprintln!("{}", "┏────────────────────────────────────────".bright_red());
         eprintln!(
             "{} {}: {}",
@@ -81,15 +79,17 @@ impl ParseError {
             self.message
         );
         eprintln!(
-            "{} {}: {}, {}",
+            "{} {}: Line {}, Column {}",
             "┃".bright_red(),
             "Location".bright_red().bold(),
-            format!("Line {}", self.line),
-            format!("Column {}", self.column)
+            self.line,
+            self.column
         );
         if self.line > 0 && self.line <= lines.len() {
-            let line_content = lines[self.line - 1].trim_end();
+            let line_content = lines[self.line - 1];
             eprintln!("{} {}: {}", "┃".bright_red(), "Code".bright_red(), line_content);
+            let padding = " ".repeat(self.column.saturating_sub(1));
+            eprintln!("{}       {}^", "┃".bright_red(), padding);
         }
         eprintln!("{}", "┃".bright_red());
     }

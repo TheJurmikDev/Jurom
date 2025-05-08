@@ -1,6 +1,6 @@
 use nom::branch::alt;
 use nom::character::complete::{multispace0, one_of};
-use nom::combinator::{opt};
+use nom::combinator::opt;
 use nom::error::context;
 use nom::sequence::tuple;
 use nom::IResult;
