@@ -101,7 +101,7 @@ Jurom is growing! 🌱 Here’s what’s working:
 - Console printing with `system.console.println`.
 
 ## 📘 Notes and information
-This project has been started since 2025 May.
+This project has been started since 2025-05-01.
 - `skidding` is not good for reputation.
 - if you ever find same code, look for date of creation.
 
