@@ -10,6 +10,13 @@ Welcome to the Jurom Language changelog! This file tracks all the updates, bug f
     - 🔧 **Changed**: Improvements or updates to existing features.
     - 🗑️ **Removed**: Features or code that were removed.
 
+## [0.1.2] - 2025-05-08
+Another small update with some features.
+
+### 🆕 Added
+- Support for multiple strings in string variable.
+- Support for adding different variables to string. 
+
 ## [0.1.1] - 2025-05-07
 Small changes I forgot to add and small fixes.
 

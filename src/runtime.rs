@@ -178,6 +178,56 @@ impl Runtime {
                             _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
                         },
                     },
+                    (Value::String(l), Value::String(r)) => {
+                        match op.as_str() {
+                            "+" => Ok(Value::String(l + &r)),
+                            _ => Err(ParseError::new(
+                                format!("Operator {} not supported for strings", op),
+                                *line,
+                                *column,
+                            )),
+                        }
+                    },
+                    (Value::String(l), Value::Number(Number::Integer(r))) => {
+                        match op.as_str() {
+                            "+" => Ok(Value::String(l + &r.to_string())),
+                            _ => Err(ParseError::new(
+                                format!("Operator {} not supported for string and number", op),
+                                *line,
+                                *column,
+                            )),
+                        }
+                    },
+                    (Value::Number(Number::Integer(l)), Value::String(r)) => {
+                        match op.as_str() {
+                            "+" => Ok(Value::String(l.to_string() + &r)),
+                            _ => Err(ParseError::new(
+                                format!("Operator {} not supported for number and string", op),
+                                *line,
+                                *column,
+                            )),
+                        }
+                    },
+                    (Value::String(l), Value::Boolean(r)) => {
+                        match op.as_str() {
+                            "+" => Ok(Value::String(l + &r.to_string())),
+                            _ => Err(ParseError::new(
+                                format!("Operator {} not supported for string and boolean", op),
+                                *line,
+                                *column,
+                            )),
+                        }
+                    },
+                    (Value::Boolean(l), Value::String(r)) => {
+                        match op.as_str() {
+                            "+" => Ok(Value::String(l.to_string() + &r)),
+                            _ => Err(ParseError::new(
+                                format!("Operator {} not supported for boolean and string", op),
+                                *line,
+                                *column,
+                            )),
+                        }
+                    },
                     _ => Err(ParseError::new("Binary operations only supported for numbers".to_string(), *line, *column)),
                 }
             }
