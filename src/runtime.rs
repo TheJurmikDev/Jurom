@@ -185,6 +185,21 @@ impl Runtime {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match (left_val, right_val) {
+                    (Value::String(l), Value::String(r)) => {
+                        let result = match op.as_str() {
+                            "==" => l == r,
+                            "!=" => l != r,
+                            "<" => l < r,
+                            ">" => l > r,
+                            "<=" => l <= r,
+                            ">=" => l >= r,
+                            _ => return Err(ParseError::new(
+                                format!("Invalid string comparison operator: {}", op),
+                                *line, *column
+                            ))
+                        };
+                        Ok(Value::Boolean(result))
+                    },
                     (Value::Number(left_num), Value::Number(right_num)) => {
                         let result = match (left_num, right_num) {
                             (Number::Integer(l), Number::Integer(r)) => match op.as_str() {

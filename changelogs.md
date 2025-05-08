@@ -18,6 +18,7 @@ Small changes I forgot to add and small fixes.
 - Added new arithmetic operator: `-`.
 - Better variable finder in scope.
 - Added \n sequence support for println.
+- Added string support while comparing.
 
 ## [0.1.0] - 2025-05-01
 Initial release of Jurom Language! 🎉 This version introduces the core features of the language, providing a foundation for learning and experimentation.
