@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 use crate::parser::{Expr};
-use crate::parser::parse_block::parse_block;
+use crate::parser::parse_statement_body::parse_statement_body;
 use crate::parser::parse_condition_in_parens::parse_condition_in_parens;
 
 pub fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
@@ -21,7 +21,7 @@ pub fn parse_if(input: &str, line: usize, column: usize) -> IResult<&str, Expr> 
                     parse_condition_in_parens(i, line, column)
                 },
                 multispace0,
-                |i| parse_block(i, line, column),
+                |i| parse_statement_body(i, line, column),
             )),
             |(_, _, condition, _, _)| condition,
         ),

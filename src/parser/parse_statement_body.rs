@@ -5,7 +5,7 @@ use nom::error::context;
 use nom::IResult;
 use nom::sequence::tuple;
 
-pub fn parse_block(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
+pub fn parse_statement_body(input: &str, _line: usize, _column: usize) -> IResult<&str, ()> {
     context(
         "block",
         map(

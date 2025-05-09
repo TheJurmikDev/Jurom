@@ -20,7 +20,7 @@ mod parse_println;
 mod parse_variable_decl;
 mod parse_function_call;
 mod parse_assignment;
-mod parse_block;
+mod parse_statement_body;
 mod parse_else_if;
 mod parse_if;
 
