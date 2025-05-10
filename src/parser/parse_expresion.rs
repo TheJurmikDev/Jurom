@@ -1,9 +1,12 @@
-use nom::branch::alt;
-use nom::character::complete::{multispace0, one_of};
-use nom::combinator::opt;
-use nom::error::context;
-use nom::sequence::tuple;
-use nom::IResult;
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::multispace0,
+    error::context,
+    multi::many0,
+    sequence::tuple,
+    IResult,
+};
 use crate::parser::Expr;
 use crate::parser::parse_boolean::parse_boolean;
 use crate::parser::parse_comparison::parse_comparison;
@@ -12,43 +15,55 @@ use crate::parser::parse_string::parse_string;
 use crate::parser::parse_variable::parse_variable;
 
 pub fn parse_expression(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
-    context("expression", |input| {
-        let (input, left) = alt((
-            |i| parse_comparison(i, line, column),
-            |i| parse_string(i, line, column),
-            |i| parse_number(i, line, column),
-            |i| parse_boolean(i, line, column),
-            |i| parse_variable(i, line, column),
-        ))(input)?;
-
-        parse_binary_op_tail(left, input, line, column)
-    })(input)
+    context("expression", |input| parse_additive(input, line, column))(input)
 }
 
-fn parse_binary_op_tail(
-    left: Expr,
-    input: &str,
-    line: usize,
-    column: usize,
-) -> IResult<&str, Expr> {
-    let (input, opt_tail) = opt(tuple((
+fn parse_additive(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    let (input, mut expr) = parse_multiplicative(input, line, column)?;
+    let (input, ops) = many0(tuple((
         multispace0,
-        one_of("-+*/"),
+        alt((tag("+"), tag("-"))),
         multispace0,
-        |i| parse_expression(i, line, column),
+        |i| parse_multiplicative(i, line, column),
     )))(input)?;
-
-    match opt_tail {
-        Some((_, op, _, right)) => {
-            let new_left = Expr::BinaryOp(
-                Box::new(left),
-                op.to_string(),
-                Box::new(right),
-                line,
-                column,
-            );
-            parse_binary_op_tail(new_left, input, line, column)
-        }
-        None => Ok((input, left)),
+    for (_, op, _, right) in ops {
+        expr = Expr::BinaryOp(
+            Box::new(expr),
+            op.to_string(),
+            Box::new(right),
+            line,
+            column,
+        );
     }
+    Ok((input, expr))
+}
+
+fn parse_multiplicative(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    let (input, mut expr) = parse_term(input, line, column)?;
+    let (input, ops) = many0(tuple((
+        multispace0,
+        alt((tag("*"), tag("/"))),
+        multispace0,
+        |i| parse_term(i, line, column),
+    )))(input)?;
+    for (_, op, _, right) in ops {
+        expr = Expr::BinaryOp(
+            Box::new(expr),
+            op.to_string(),
+            Box::new(right),
+            line,
+            column,
+        );
+    }
+    Ok((input, expr))
+}
+
+fn parse_term(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
+    alt((
+        |i| parse_comparison(i, line, column),
+        |i| parse_string(i, line, column),
+        |i| parse_number(i, line, column),
+        |i| parse_boolean(i, line, column),
+        |i| parse_variable(i, line, column),
+    ))(input)
 }

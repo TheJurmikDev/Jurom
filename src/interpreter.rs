@@ -89,6 +89,9 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                 } => {
                     runtime.execute_if(condition, body, else_if, else_branch)?;
                 }
+                Stmt::While { condition, body } => {
+                    runtime.execute_while(condition, body)?;
+                }
                 _ => {}
             }
         }

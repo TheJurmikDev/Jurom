@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use crate::parser::{Expr, Literal, Stmt, ParseError};
 use std::collections::HashMap;
 
@@ -7,7 +8,7 @@ pub enum Number {
     Float(f64),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     String(String),
     Number(Number),
@@ -52,6 +53,53 @@ impl Runtime {
             }
         }
         None
+    }
+
+    pub fn execute_while(&mut self, condition: &Expr, body: &[Stmt]) -> Result<(), ParseError> {
+        self.push_scope();
+        while self.evaluate_expr(condition)? == Value::Boolean(true) {
+            for stmt in body {
+                match stmt {
+                    Stmt::Expr(Expr::FunctionCall { name, args, line, column }) => {
+                        self.call_function(name, args, *line, *column)?;
+                    }
+                    Stmt::VariableDecl(_type_name, var_name, expr) => {
+                        let value = self.evaluate_expr(expr)?;
+                        self.set_variable(var_name.clone(), value.clone());
+                    }
+                    Stmt::Assignment(var_name, expr) => {
+                        if self.get_variable(var_name).is_none() {
+                            return Err(ParseError::new(
+                                format!("Variable {} not found", var_name),
+                                condition.get_line(),
+                                condition.get_column(),
+                            ));
+                        }
+                        let value = self.evaluate_expr(expr)?;
+                        for scope in self.variable_scopes.iter_mut().rev() {
+                            if scope.contains_key(var_name) {
+                                scope.insert(var_name.clone(), value.clone());
+                                break;
+                            }
+                        }
+                    }
+                    Stmt::If {
+                        condition,
+                        body,
+                        else_if,
+                        else_branch,
+                    } => {
+                        self.execute_if(condition, body, else_if, else_branch)?;
+                    }
+                    Stmt::While { condition, body } => {
+                        self.execute_while(condition, body)?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self.pop_scope();
+        Ok(())
     }
 
     pub fn evaluate_expr(&self, expr: &Expr) -> Result<Value, ParseError> {

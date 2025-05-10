@@ -23,6 +23,7 @@ mod parse_assignment;
 mod parse_statement_body;
 mod parse_else_if;
 mod parse_if;
+mod parse_while;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
@@ -53,6 +54,10 @@ pub enum Stmt {
         body: Vec<Stmt>,
         else_if: Vec<(Expr, Vec<Stmt>)>,
         else_branch: Option<Box<Stmt>>,
+    },
+    While {
+        condition: Expr,
+        body: Vec<Stmt>,
     },
     Block(Vec<Stmt>),
 }
@@ -113,6 +118,8 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut block_depth = 0;
     let mut if_block_depth = 0;
     let mut declared_variables: HashMap<String, (usize, usize)> = HashMap::new();
+    let mut while_stack: Vec<(Expr, Vec<Stmt>)> = Vec::new();
+    let mut while_block_depth: isize = 0;
 
     let lines: Vec<&str> = code.lines().collect();
     let mut line_index = 0;
@@ -228,6 +235,48 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         match &stmt {
             Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK" => {
                 block_depth -= 1;
+                if !while_stack.is_empty() {
+                    while_block_depth -= 1;
+                    if while_block_depth < 0 {
+                        return Err(ParseError::new(
+                            "Mismatched while block closure".to_string(),
+                            line_index + 1,
+                            column,
+                        ));
+                    }
+                    if while_block_depth == 0 || (while_stack.len() > 1 && while_block_depth == (while_stack.len() - 1) as isize) {
+                        if let Some((condition, while_body)) = while_stack.pop() {
+                            let while_stmt = Stmt::While {
+                                condition,
+                                body: while_body,
+                            };
+                            if !while_stack.is_empty() {
+                                if let Some(last) = while_stack.last_mut() {
+                                    last.1.push(while_stmt.clone());
+                                }
+                            } else if !if_stack.is_empty() {
+                                if let Some(last) = if_stack.last_mut() {
+                                    if last.4 {
+                                        last.3.push(while_stmt.clone());
+                                    } else if last.5 && !last.2.is_empty() {
+                                        if let Some(last_branch) = last.2.last_mut() {
+                                            last_branch.1.push(while_stmt.clone());
+                                        }
+                                    } else {
+                                        last.1.push(while_stmt.clone());
+                                    }
+                                }
+                            } else if current_function.is_some() {
+                                function_body.push(while_stmt.clone());
+                            } else if current_class.is_some() {
+                                class_body.push(while_stmt.clone());
+                            } else {
+                                stmts.push(while_stmt.clone());
+                            }
+                            while_block_depth = while_stack.len() as isize;
+                        }
+                    }
+                }
                 if !if_stack.is_empty() {
                     if_block_depth -= 1;
                     if if_stack.last().map_or(false, |last| last.4 && if_block_depth <= 0) {
@@ -319,6 +368,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                     }
                 }
             }
+            Stmt::While { condition, .. } => {
+                while_stack.push((condition.clone(), Vec::new()));
+                block_depth += 1;
+                while_block_depth += 1;
+                line_index += 1;
+                continue;
+            }
             Stmt::If { condition, .. } => {
                 if_stack.push((condition.clone(), Vec::new(), Vec::new(), Vec::new(), false, false));
                 block_depth += 1;
@@ -349,7 +405,20 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         }
 
         if !matches!(&stmt, Stmt::Expr(Expr::Literal(Literal::String(s), _, _)) if s == "END_BLOCK") {
-            if !if_stack.is_empty() {
+            if !while_stack.is_empty() {
+                let target_stack_index = while_block_depth.saturating_sub(1) as usize;
+                if target_stack_index < while_stack.len() {
+                    if let Some(last) = while_stack.get_mut(target_stack_index) {
+                        last.1.push(stmt.clone());
+                    }
+                } else {
+                    return Err(ParseError::new(
+                        "Statement outside of expected while block".to_string(),
+                        line_index + 1,
+                        column,
+                    ));
+                }
+            } else if !if_stack.is_empty() {
                 if let Some(last) = if_stack.last_mut() {
                     if last.4 {
                         last.3.push(stmt.clone());
@@ -376,6 +445,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     if !if_stack.is_empty() {
         return Err(ParseError::new(
             "Unclosed if block".to_string(),
+            lines.len(),
+            1,
+        ));
+    }
+    if !while_stack.is_empty() {
+        return Err(ParseError::new(
+            "Unclosed while block".to_string(),
             lines.len(),
             1,
         ));

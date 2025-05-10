@@ -10,6 +10,13 @@ Welcome to the Jurom Language changelog! This file tracks all the updates, bug f
     - 🔧 **Changed**: Improvements or updates to existing features.
     - 🗑️ **Removed**: Features or code that were removed.
 
+## [0.1.3] - 2025-05-10
+Some fixes and other things
+
+### 🐛 Fixed
+- Support for nested while.
+- Added back fixed while function.
+
 ## [0.1.2] - 2025-05-08
 Another small update with some features.
 
