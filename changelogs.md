@@ -10,6 +10,13 @@ Welcome to the Jurom Language changelog! This file tracks all the updates, bug f
     - 🔧 **Changed**: Improvements or updates to existing features.
     - 🗑️ **Removed**: Features or code that were removed.
 
+## [0.1.4] - 2025-05-12
+New things nom nom nom.
+
+### 🆕 Added
+- Added support for `(` in math operation.
+- Added support for `)` in math operation.
+
 ## [0.1.3] - 2025-05-10
 Some fixes and other things.
 

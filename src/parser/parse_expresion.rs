@@ -4,7 +4,7 @@ use nom::{
     character::complete::multispace0,
     error::context,
     multi::many0,
-    sequence::tuple,
+    sequence::{delimited, tuple},
     IResult,
 };
 use crate::parser::Expr;
@@ -60,6 +60,11 @@ fn parse_multiplicative(input: &str, line: usize, column: usize) -> IResult<&str
 
 fn parse_term(input: &str, line: usize, column: usize) -> IResult<&str, Expr> {
     alt((
+        delimited(
+            tag("("),
+            delimited(multispace0, |i| parse_expression(i, line, column), multispace0),
+            tag(")"),
+        ),
         |i| parse_comparison(i, line, column),
         |i| parse_string(i, line, column),
         |i| parse_number(i, line, column),
