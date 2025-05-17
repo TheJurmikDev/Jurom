@@ -67,11 +67,26 @@ pub struct ParseError {
     pub message: String,
     pub line: usize,
     pub column: usize,
+    pub hint: Option<String>,
 }
 
 impl ParseError {
     pub fn new(message: String, line: usize, column: usize) -> Self {
-        ParseError { message, line, column }
+        ParseError {
+            message,
+            line,
+            column,
+            hint: None,
+        }
+    }
+
+    pub fn with_hint(message: String, line: usize, column: usize, hint: String) -> Self {
+        ParseError {
+            message,
+            line,
+            column,
+            hint: Some(hint),
+        }
     }
 
     pub fn print(&self, code: &str) {
@@ -98,13 +113,24 @@ impl ParseError {
             let padding = " ".repeat(self.column.saturating_sub(1 + leading_spaces));
             eprintln!("{}       {}^", "┃".bright_red(), padding.bright_red());
         }
+        if let Some(hint) = &self.hint {
+            eprintln!("{} {}: {}", "┃".bright_red(), "Hint".bright_red().bold(), hint);
+        }
         eprintln!("{}", "┃".bright_red());
     }
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} at line {}, column {}", self.message, self.line, self.column)
+        write!(
+            f,
+            "{} at line {}, column {}",
+            self.message, self.line, self.column
+        )?;
+        if let Some(hint) = &self.hint {
+            write!(f, " (Hint: {})", hint)?;
+        }
+        Ok(())
     }
 }
 
@@ -141,10 +167,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 .trim()
                 .to_string();
             if current_class.is_some() {
-                return Err(ParseError::new(
+                return Err(ParseError::with_hint(
                     "Nested classes are not supported".to_string(),
                     line_index + 1,
                     column,
+                    "Remove the nested class or move it outside the current class.".to_string(),
                 ));
             }
             current_class = Some(class_name);
@@ -153,13 +180,13 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             block_depth += 1;
             line_index += 1;
             continue;
-        }
-        else if trimmed.starts_with("function") {
+        } else if trimmed.starts_with("function") {
             if current_function.is_some() {
-                return Err(ParseError::new(
+                return Err(ParseError::with_hint(
                     "Nested functions are not supported".to_string(),
                     line_index + 1,
                     column,
+                    "Move the function outside the current function.".to_string(),
                 ));
             }
             let func_name = trimmed
@@ -190,28 +217,44 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 }
                 nom::Err::Incomplete(_) => "Incomplete input".to_string(),
             };
+            let hint = match &e {
+                nom::Err::Error(err) | nom::Err::Failure(err) => {
+                    if trimmed.starts_with("if ") {
+                        Some("Ensure the if statement has a valid condition in parentheses and a block body.".to_string())
+                    } else if trimmed.starts_with("else ") {
+                        Some("Ensure the else statement follows a valid if or else if block.".to_string())
+                    } else if err.code == ErrorKind::Tag && trimmed.contains("=") && !trimmed.ends_with(";") {
+                        Some("Add a semicolon (;) at the end of the statement.".to_string())
+                    } else {
+                        Some("Check the syntax and ensure all keywords and operators are used correctly.".to_string())
+                    }
+                }
+                nom::Err::Incomplete(_) => Some("Complete the statement or expression.".to_string()),
+            };
             let error_input = match &e {
                 nom::Err::Error(err) | nom::Err::Failure(err) => err.input,
                 nom::Err::Incomplete(_) => trimmed,
             };
             let error_column = column + (trimmed.len() - error_input.len());
-            ParseError::new(message, line_index + 1, error_column)
+            ParseError::with_hint(message, line_index + 1, error_column, hint.unwrap())
         })?;
 
         if !rest.is_empty() {
-            return Err(ParseError::new(
+            return Err(ParseError::with_hint(
                 format!("Unexpected tokens: {}", rest),
                 line_index + 1,
                 column + (trimmed.len() - rest.len()),
+                "Remove or correct the unexpected tokens.".to_string(),
             ));
         }
 
         if let Some((ref else_type, ref condition)) = else_part {
             if if_stack.is_empty() {
-                return Err(ParseError::new(
+                return Err(ParseError::with_hint(
                     format!("{} without matching if", else_type),
                     line_index + 1,
                     column,
+                    format!("Add a matching 'if' statement before '{}'.", else_type),
                 ));
             }
             if else_type == "else if" {
@@ -238,10 +281,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                 if !while_stack.is_empty() {
                     while_block_depth -= 1;
                     if while_block_depth < 0 {
-                        return Err(ParseError::new(
+                        return Err(ParseError::with_hint(
                             "Mismatched while block closure".to_string(),
                             line_index + 1,
                             column,
+                            "Check for missing or extra closing braces in while blocks.".to_string(),
                         ));
                     }
                     if while_block_depth == 0 || (while_stack.len() > 1 && while_block_depth == (while_stack.len() - 1) as isize) {
@@ -384,20 +428,22 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
             }
             Stmt::VariableDecl(_type_name, var_name, _) => {
                 if declared_variables.contains_key(var_name) {
-                    return Err(ParseError::new(
+                    return Err(ParseError::with_hint(
                         format!("Variable {} already declared", var_name),
                         line_index + 1,
                         column,
+                        "Use a different variable name or remove the duplicate declaration.".to_string(),
                     ));
                 }
                 declared_variables.insert(var_name.clone(), (line_index + 1, column));
             }
             Stmt::Assignment(var_name, _) => {
                 if !declared_variables.contains_key(var_name) {
-                    return Err(ParseError::new(
+                    return Err(ParseError::with_hint(
                         format!("Variable {} not declared before assignment", var_name),
                         line_index + 1,
                         column,
+                        format!("Declare the variable using 'num {} = value;' before assigning to it.", var_name),
                     ));
                 }
             }
@@ -412,10 +458,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
                         last.1.push(stmt.clone());
                     }
                 } else {
-                    return Err(ParseError::new(
+                    return Err(ParseError::with_hint(
                         "Statement outside of expected while block".to_string(),
                         line_index + 1,
                         column,
+                        "Ensure the statement is inside a valid while block or remove it.".to_string(),
                     ));
                 }
             } else if !if_stack.is_empty() {
@@ -443,24 +490,27 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
     }
 
     if !if_stack.is_empty() {
-        return Err(ParseError::new(
+        return Err(ParseError::with_hint(
             "Unclosed if block".to_string(),
             lines.len(),
             1,
+            "Add a closing brace '}' to complete the if block.".to_string(),
         ));
     }
     if !while_stack.is_empty() {
-        return Err(ParseError::new(
+        return Err(ParseError::with_hint(
             "Unclosed while block".to_string(),
             lines.len(),
             1,
+            "Add a closing brace '}' to complete the while block.".to_string(),
         ));
     }
     if current_function.is_some() {
-        return Err(ParseError::new(
+        return Err(ParseError::with_hint(
             "Unclosed function block".to_string(),
             lines.len(),
             1,
+            "Add a closing brace '}' to complete the function block.".to_string(),
         ));
     }
     if current_class.is_some() {
@@ -469,10 +519,11 @@ pub fn parse_program(code: &str) -> Result<Vec<Stmt>, ParseError> {
         }
     }
     if block_depth != 0 {
-        return Err(ParseError::new(
+        return Err(ParseError::with_hint(
             "Unclosed block".to_string(),
             lines.len(),
             1,
+            "Add a closing brace '}' to complete the block.".to_string(),
         ));
     }
 

@@ -10,6 +10,13 @@ Welcome to the Jurom Language changelog! This file tracks all the updates, bug f
     - 🔧 **Changed**: Improvements or updates to existing features.
     - 🗑️ **Removed**: Features or code that were removed.
 
+## [0.1.5] - 2025-05-17
+Finally, I know where is the bug.
+
+### 🆕 Added
+- Enchanced error handling.
+- Added hints to error showing.
+
 ## [0.1.4] - 2025-05-12
 New things nom nom nom.
 

@@ -119,7 +119,12 @@ impl Runtime {
                         return Ok(value.clone());
                     }
                 }
-                Err(ParseError::new(format!("Variable {} not found", name), *line, *column))
+                Err(ParseError::with_hint(
+                    format!("Variable {} not found", name),
+                    *line,
+                    *column,
+                    format!("Declare the variable using 'num {} = value;' before using it.", name),
+                ))
             }
             Expr::BinaryOp(left, op, right, line, column) => {
                 let left_val = self.evaluate_expr(left)?;
@@ -132,7 +137,12 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Integer(l * r))),
                             "/" => {
                                 if r == 0 {
-                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
+                                    Err(ParseError::with_hint(
+                                        "Cannot divide by zero".to_string(),
+                                        *line,
+                                        *column,
+                                        "Ensure the divisor is not zero.".to_string(),
+                                    ))
                                 } else {
                                     let result = l / r;
                                     if result >= i64::MIN && result <= i64::MAX && result % 1 == 0 {
@@ -142,7 +152,12 @@ impl Runtime {
                                     }
                                 }
                             }
-                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                            _ => Err(ParseError::with_hint(
+                                format!("Unknown operator: {}", op),
+                                *line,
+                                *column,
+                                "Use a supported operator (+, -, *, /).".to_string(),
+                            )),
                         },
                         (Number::Float(l), Number::Float(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Float(l + r))),
@@ -150,12 +165,22 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Float(l * r))),
                             "/" => {
                                 if r == 0.0 {
-                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
+                                    Err(ParseError::with_hint(
+                                        "Cannot divide by zero".to_string(),
+                                        *line,
+                                        *column,
+                                        "Ensure the divisor is not zero.".to_string(),
+                                    ))
                                 } else {
                                     Ok(Value::Number(Number::Float(l / r)))
                                 }
                             }
-                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                            _ => Err(ParseError::with_hint(
+                                format!("Unknown operator: {}", op),
+                                *line,
+                                *column,
+                                "Use a supported operator (+, -, *, /).".to_string(),
+                            )),
                         },
                         (Number::Integer(l), Number::Float(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Float(l as f64 + r))),
@@ -168,7 +193,12 @@ impl Runtime {
                                     Ok(Value::Number(Number::Float(l as f64 / r)))
                                 }
                             }
-                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                            _ => Err(ParseError::with_hint(
+                                format!("Unknown operator: {}", op),
+                                *line,
+                                *column,
+                                "Use a supported operator (+, -, *, /).".to_string(),
+                            )),
                         },
                         (Number::Float(l), Number::Integer(r)) => match op.as_str() {
                             "+" => Ok(Value::Number(Number::Float(l + r as f64))),
@@ -176,65 +206,85 @@ impl Runtime {
                             "*" => Ok(Value::Number(Number::Float(l * r as f64))),
                             "/" => {
                                 if r == 0 {
-                                    Err(ParseError::new("Cannot divide by zero".to_string(), *line, *column))
+                                    Err(ParseError::with_hint(
+                                        "Cannot divide by zero".to_string(),
+                                        *line,
+                                        *column,
+                                        "Ensure the divisor is not zero.".to_string(),
+                                    ))
                                 } else {
                                     Ok(Value::Number(Number::Float(l / r as f64)))
                                 }
                             }
-                            _ => Err(ParseError::new(format!("Unknown operator: {}", op), *line, *column)),
+                            _ => Err(ParseError::with_hint(
+                                format!("Unknown operator: {}", op),
+                                *line,
+                                *column,
+                                "Use a supported operator (+, -, *, /).".to_string(),
+                            )),
                         },
                     },
                     (Value::String(l), Value::String(r)) => {
                         match op.as_str() {
                             "+" => Ok(Value::String(l + &r)),
-                            _ => Err(ParseError::new(
+                            _ => Err(ParseError::with_hint(
                                 format!("Operator {} not supported for strings", op),
                                 *line,
                                 *column,
+                                "Use a supported operator ( + )".to_string(),
                             )),
                         }
                     },
                     (Value::String(l), Value::Number(Number::Integer(r))) => {
                         match op.as_str() {
                             "+" => Ok(Value::String(l + &r.to_string())),
-                            _ => Err(ParseError::new(
+                            _ => Err(ParseError::with_hint(
                                 format!("Operator {} not supported for string and number", op),
                                 *line,
                                 *column,
+                                "Use a supported operator ( + )".to_string(),
                             )),
                         }
                     },
                     (Value::Number(Number::Integer(l)), Value::String(r)) => {
                         match op.as_str() {
                             "+" => Ok(Value::String(l.to_string() + &r)),
-                            _ => Err(ParseError::new(
+                            _ => Err(ParseError::with_hint(
                                 format!("Operator {} not supported for number and string", op),
                                 *line,
                                 *column,
+                                "Use a supported operator ( + )".to_string(),
                             )),
                         }
                     },
                     (Value::String(l), Value::Boolean(r)) => {
                         match op.as_str() {
                             "+" => Ok(Value::String(l + &r.to_string())),
-                            _ => Err(ParseError::new(
+                            _ => Err(ParseError::with_hint(
                                 format!("Operator {} not supported for string and boolean", op),
                                 *line,
                                 *column,
+                                "Use a supported operator ( + )".to_string(),
                             )),
                         }
                     },
                     (Value::Boolean(l), Value::String(r)) => {
                         match op.as_str() {
                             "+" => Ok(Value::String(l.to_string() + &r)),
-                            _ => Err(ParseError::new(
+                            _ => Err(ParseError::with_hint(
                                 format!("Operator {} not supported for boolean and string", op),
                                 *line,
                                 *column,
+                                "Use a supported operator ( + )".to_string(),
                             )),
                         }
                     },
-                    _ => Err(ParseError::new("Binary operations only supported for numbers".to_string(), *line, *column)),
+                    _ => Err(ParseError::with_hint(
+                        "Binary operations only supported for numbers, booleans and strings".to_string(),
+                        *line,
+                        *column,
+                        "Ensure both operands are supported.".to_string(),
+                    )),
                 }
             }
             Expr::Comparison(left, op, right, line, column) => {
@@ -249,10 +299,12 @@ impl Runtime {
                             ">" => l > r,
                             "<=" => l <= r,
                             ">=" => l >= r,
-                            _ => return Err(ParseError::new(
+                            _ => return Err(ParseError::with_hint(
                                 format!("Invalid string comparison operator: {}", op),
-                                *line, *column
-                            ))
+                                *line,
+                                *column,
+                                "Use a valid comparison operator (==, !=, <, >, <=, >=).".to_string(),
+                            )),
                         };
                         Ok(Value::Boolean(result))
                     },
@@ -265,13 +317,12 @@ impl Runtime {
                                 ">" => l > r,
                                 "<=" => l <= r,
                                 ">=" => l >= r,
-                                _ => {
-                                    return Err(ParseError::new(
-                                        format!("Unknown comparison operator: {}", op),
-                                        *line,
-                                        *column,
-                                    ))
-                                }
+                                _ => return Err(ParseError::with_hint(
+                                    format!("Invalid number comparison operator: {}", op),
+                                    *line,
+                                    *column,
+                                    "Use a valid comparison operator (==, !=, <, >, <=, >=).".to_string(),
+                                )),
                             },
                             (Number::Float(l), Number::Float(r)) => {
                                 const EPSILON: f64 = 1e-10;
@@ -282,13 +333,12 @@ impl Runtime {
                                     ">" => l > r + EPSILON,
                                     "<=" => l <= r + EPSILON,
                                     ">=" => l >= r - EPSILON,
-                                    _ => {
-                                        return Err(ParseError::new(
-                                            format!("Unknown comparison operator: {}", op),
-                                            *line,
-                                            *column,
-                                        ))
-                                    }
+                                    _ => return Err(ParseError::with_hint(
+                                        format!("Invalid number comparison operator: {}", op),
+                                        *line,
+                                        *column,
+                                        "Use a valid comparison operator (==, !=, <, >, <=, >=).".to_string(),
+                                    )),
                                 }
                             }
                             (Number::Integer(l), Number::Float(r)) => {
@@ -300,13 +350,12 @@ impl Runtime {
                                     ">" => (l as f64) > r + EPSILON,
                                     "<=" => (l as f64) <= r + EPSILON,
                                     ">=" => (l as f64) >= r - EPSILON,
-                                    _ => {
-                                        return Err(ParseError::new(
-                                            format!("Unknown comparison operator: {}", op),
-                                            *line,
-                                            *column,
-                                        ))
-                                    }
+                                    _ => return Err(ParseError::with_hint(
+                                        format!("Invalid number comparison operator: {}", op),
+                                        *line,
+                                        *column,
+                                        "Use a valid comparison operator (==, !=, <, >, <=, >=).".to_string(),
+                                    )),
                                 }
                             }
                             (Number::Float(l), Number::Integer(r)) => {
@@ -318,22 +367,22 @@ impl Runtime {
                                     ">" => l > (r as f64) + EPSILON,
                                     "<=" => l <= (r as f64) + EPSILON,
                                     ">=" => l >= (r as f64) - EPSILON,
-                                    _ => {
-                                        return Err(ParseError::new(
-                                            format!("Unknown comparison operator: {}", op),
-                                            *line,
-                                            *column,
-                                        ))
-                                    }
+                                    _ => return Err(ParseError::with_hint(
+                                        format!("Invalid number comparison operator: {}", op),
+                                        *line,
+                                        *column,
+                                        "Use a valid comparison operator (==, !=, <, >, <=, >=).".to_string(),
+                                    )),
                                 }
                             }
                         };
                         Ok(Value::Boolean(result))
                     }
-                    _ => Err(ParseError::new(
-                        "Comparison operations only supported for numbers".to_string(),
+                    _ => Err(ParseError::with_hint(
+                        "Comparison operations only supported for numbers and strings".to_string(),
                         *line,
                         *column,
+                        "Ensure both operands are numbers or strings.".to_string(),
                     )),
                 }
             }
@@ -352,10 +401,20 @@ impl Runtime {
                             Value::Boolean(b) => Ok(Value::String(b.to_string())),
                         }
                     } else {
-                        Err(ParseError::new("No argument provided for println".to_string(), *line, *column))
+                        Err(ParseError::with_hint(
+                            "No argument provided for println".to_string(),
+                            *line,
+                            *column,
+                            "Provide a value to print, e.g., println(\"Hello\");".to_string(),
+                        ))
                     }
                 } else {
-                    Err(ParseError::new("Function calls not supported in expressions".to_string(), *line, *column))
+                    Err(ParseError::with_hint(
+                        "Function calls not supported in expressions".to_string(),
+                        *line,
+                        *column,
+                        "Use function calls as statements, not in expressions.".to_string(),
+                    ))
                 }
             }
         }

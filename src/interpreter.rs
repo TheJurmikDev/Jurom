@@ -22,10 +22,11 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                         }
                         Stmt::Assignment(var_name, expr) => {
                             if runtime.get_variable(&var_name).is_none() {
-                                return Err(ParseError::new(
+                                return Err(ParseError::with_hint(
                                     format!("Variable {} not found", var_name),
                                     expr.get_line(),
                                     expr.get_column(),
+                                    format!("Declare the variable using 'num {} = value;' before assigning to it.", var_name),
                                 ));
                             }
                             let value = runtime.evaluate_expr(expr)?;
@@ -47,10 +48,11 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
             }
             Stmt::Assignment(var_name, expr) => {
                 if runtime.get_variable(&var_name).is_none() {
-                    return Err(ParseError::new(
+                    return Err(ParseError::with_hint(
                         format!("Variable {} not found", var_name),
                         expr.get_line(),
                         expr.get_column(),
+                        format!("Declare the variable using 'num {} = value;' before assigning to it.", var_name),
                     ));
                 }
                 let value = runtime.evaluate_expr(expr)?;
@@ -72,10 +74,11 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
                 }
                 Stmt::Assignment(var_name, expr) => {
                     if runtime.get_variable(&var_name).is_none() {
-                        return Err(ParseError::new(
+                        return Err(ParseError::with_hint(
                             format!("Variable {} not found", var_name),
                             expr.get_line(),
                             expr.get_column(),
+                            format!("Declare the variable using 'num {} = value;' before assigning to it.", var_name),
                         ));
                     }
                     let value = runtime.evaluate_expr(expr)?;
@@ -96,7 +99,12 @@ pub fn execute(stmts: Vec<Stmt>) -> Result<(), ParseError> {
             }
         }
     } else {
-        return Err(ParseError::new("No main function found".to_string(), 0, 0));
+        return Err(ParseError::with_hint(
+            "No main function found".to_string(),
+            0,
+            0,
+            "Add a 'function main() { ... }' to your program.".to_string(),
+        ));
     }
 
     Ok(())
