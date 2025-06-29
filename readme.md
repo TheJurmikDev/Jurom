@@ -144,6 +144,10 @@ Jurom's compiler mode generates optimized code with:
 - [ ] **Module System**
 - [ ] **Standard Library Expansion**
 
+## 📗 ChangeLogs
+
+You can find all changelogs in [ChangeLogs](changelog.md).
+
 ## 📄 License
 
 This project is open source and available under the [GNU License](LICENSE).
