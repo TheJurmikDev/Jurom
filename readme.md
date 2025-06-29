@@ -1,8 +1,8 @@
 # 🚀 Jurom Programming Language
 
-> **A modern, minimalist programming language that compiles to C++ or runs directly via interpreter.**
+> **A modern, minimalist programming language that has modern solution**
 
-Jurom is a clean, Java inspired programming language designed for simplicity and performance. With its elegant syntax and dual execution modes, Jurom bridges the gap between rapid prototyping and high-performance compiled code.
+Jurom is a clean, Java / Python inspired programming language designed for simplicity and performance. With its elegant syntax and triple execution modes, Jurom bridges the gap between rapid prototyping and high-performance compiled code.
 
 ## ✨ Features
 
@@ -13,9 +13,10 @@ Jurom is a clean, Java inspired programming language designed for simplicity and
 - **Variables & Expressions** - Full arithmetic and comparison operations
 - **Method Chaining** - Clean, readable code with dot notation
 
-### ⚡ **Dual Execution Modes**
+### ⚡ **Triple Execution Modes**
 - **🔧 Transpiler Mode** - Transpiles to optimized C++ code, then compiles to native executable
 - **🚀 Interpreter Mode** - Direct execution for rapid development and testing
+- **👷 Compiler Mode** - Compiles project code to highly optimized native executable
 
 ---
 
@@ -36,7 +37,7 @@ Jurom is a clean, Java inspired programming language designed for simplicity and
 ### Set up your project
 1. **Create new project**
    ```bash
-   ./jurom.exe create my_project
+   ./jurom.exe create
    cd my_project
    ```
 
@@ -100,6 +101,13 @@ Jurom is a clean, Java inspired programming language designed for simplicity and
 3. **Semantic Analysis** – Checking correctness of syntax and types
 4. **Code Generation** - AST → Optimized C++ code
 5. **Native Compilation** - C++ code → Platform-specific executable
+6. 
+### ⏩ **Compilation Process**
+1. **Lexical Analysis** - Source code → Tokens
+2. **Parsing** - Tokens → Abstract Syntax Tree (AST)
+3. **Semantic Analysis** – Checking correctness of syntax and types
+4. **Code Generation** - AST → Optimized Jurom code
+5. **Native Compilation** - Juom code → Platform-specific executable
 
 ### 🎨 **Architecture Highlights**
 - **Rust-Powered** - Memory-safe, fast compilation
@@ -114,10 +122,15 @@ Jurom's interpret mode runs code interactively via a Rust based runtime:
 - **Memory Efficient**: Variables in `HashMap` with Rust's stack based locals.
 - **Fast Execution**: Leverages Rust's speed for responsive performance.
 
-Jurom's compiler mode generates optimized C++ code with:
+Jurom's transpiler mode generates optimized C++ code with:
 - **Zero Runtime Overhead** - Direct C++ compilation
 - **Memory Efficiency** - Stack-allocated variables
 - **Native Speed** - Full compiler optimizations (-O3)
+
+Jurom's compiler mode generates optimized code with:
+- **Extreme Optimization** - Uses agresive optimization while compiling
+- **Static Binary Output** – Produces standalone executables with no dynamic linking overhead
+- **Scalable Memory Model** – Efficient stack allocation with support for larger code and data sections
 
 ## 🛣️ Roadmap
 
@@ -140,3 +153,5 @@ This project is open source and available under the [GNU License](LICENSE).
 **Made with ❤️ for developers who appreciate clean, fast languages.**
 
 *Jurom - Where simplicity meets performance.*
+
+### 😎 Made By TheJurmik | Visit offical site https://thejurmik.dev
