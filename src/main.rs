@@ -132,12 +132,12 @@ fn create_project_interactive() {
 
     println!("{}", RESET);
     println!("{}🔋 Creating project '{}' with the following settings:{}", GREEN, project_name, RESET);
-    println!("{}  Version: {}{}{}{}{}", DIM, RESET, YELLOW, BOLD, project_version, RESET);
-    println!("{}  Author: {}{}{}{}{}", DIM, RESET, YELLOW, BOLD, project_author, RESET);
-    println!("{}  Mode: {}{}{}{}{}", DIM, RESET, YELLOW, BOLD, project_mode, RESET);
-    println!("{}  Transpiler Mode: {}{}{}{}{}", DIM, RESET, YELLOW, BOLD, project_transpiler_mode, RESET);
-    println!("{}  Source Path: {}{}{}{}{}", DIM, RESET, YELLOW, BOLD, project_src_path, RESET);
-    println!("{}  Main File: {}{}{}{}{}", DIM, RESET, YELLOW, BOLD, project_main_file, RESET);
+    println!("{}  Version: {}{}{}{}", DIM, RESET, YELLOW, project_version, RESET);
+    println!("{}  Author: {}{}{}{}", DIM, RESET, YELLOW, project_author, RESET);
+    println!("{}  Mode: {}{}{}{}", DIM, RESET, YELLOW, project_mode, RESET);
+    println!("{}  Transpiler Mode: {}{}{}{}", DIM, RESET, YELLOW, project_transpiler_mode, RESET);
+    println!("{}  Source Path: {}{}{}{}", DIM, RESET, YELLOW, project_src_path, RESET);
+    println!("{}  Main File: {}{}{}{}", DIM, RESET, YELLOW, project_main_file, RESET);
     println!();
 
 
@@ -216,7 +216,7 @@ main_file = "{}"
     }
 
     println!("{}✅  Project '{}' created successfully!{}", GREEN, project_name, RESET);
-    println!("{}{}📁 Project structure:{}{}", YELLOW, BOLD, RESET, YELLOW);
+    println!("{}📁 Project structure:", YELLOW);
     println!("   {}/", project_name);
     println!("   ├── .gitignore");
     println!("   ├── config.jurom");
@@ -224,9 +224,9 @@ main_file = "{}"
     println!("       └── {}{}", project_main_file, RESET);
     println!(" ");
     println!("{}💡 To run your project:{}", GREEN, RESET);
-    println!("   {}cd {}{}{}{}{}", DIM, RESET, BOLD, YELLOW, project_name, RESET);
-    println!("   {}jurom {}{}{}build{}",DIM, RESET, BOLD, YELLOW, RESET);
-    println!("   {}jurom {}{}{}run{}", DIM, RESET, BOLD, YELLOW, RESET);
+    println!("   {}cd {}{}{}{}", DIM, RESET, YELLOW, project_name, RESET);
+    println!("   {}jurom {}{}build{}",DIM, RESET, YELLOW, RESET);
+    println!("   {}jurom {}{}run{}", DIM, RESET, YELLOW, RESET);
     println!("{}", RESET);
 }
 
