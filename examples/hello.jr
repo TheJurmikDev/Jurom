@@ -1,0 +1,12 @@
+public class HelloWorld {
+    function main() {
+        string greeting = "Hello, JR!";
+        println(greeting);
+
+        num count = 1;
+        while (count < 5) {
+            println(count);
+            count = count + 1;
+        }
+    }
+}

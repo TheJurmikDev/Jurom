@@ -1,124 +1,142 @@
-# 🚀 Jurom Language
-Jurom is a simple programming language built for learning and fun! It uses easy syntax, inspired by Java, and runs on a lightweight language named Rust. Whether you're a beginner writing your first program or a developer experimenting with a new language, Jurom makes coding easy and enjoyable. Programs are written in `.jr` files and executed with a single command.
+# 🚀 Jurom Programming Language
+
+> **A modern, minimalist programming language that compiles to C++ or runs directly via interpreter.**
+
+Jurom is a clean, Java inspired programming language designed for simplicity and performance. With its elegant syntax and dual execution modes, Jurom bridges the gap between rapid prototyping and high-performance compiled code.
 
 ## ✨ Features
-- 📚 **Classes**: Write programs inside a `public class`, just like Java.
-- ⚡ **Main Function**: Every program starts with a `function main()`.
-- 🔧 **Custom Functions**: Create and call your own functions.
-- 💡 **Variable Types**: Use `num` (for numbers), `string`, and `boolean`.
-- 🔄 **Variable Updates**: Change variable values as needed.
-- 🔢 **Smart Numbers**: `num` automatically handles integers and decimals.
-- ✅ **Conditionals**: Use `if`, `else if`, and `else` for decision-making.
-- 🔁 **Loops**: Write `while` loops to repeat actions.
-- 🖨️ **Console Output**: Print text, numbers, or booleans with `system.console.println`.
-- 🧮 **Operators**: Supports `+`, `-`, `*`, `/`, `=`, `<`, `>`, `<=`, `>=`, `!=`.
 
-## 🛠️ Installation
-To start using Jurom, you need [Rust](https://www.rust-lang.org/) installed. Follow these steps:
+### 🎯 **Core Language Features**
+- **Object-Oriented Programming** - Classes, methods, and encapsulation
+- **Static Typing** - `num` for numbers, `string` for text
+- **Control Flow** - `if/else` statements and `while` loops
+- **Variables & Expressions** - Full arithmetic and comparison operations
+- **Method Chaining** - Clean, readable code with dot notation
 
-1. **Install Rust**:
-    - Visit [rust-lang.org](https://www.rust-lang.org/tools/install) and install Rust.
-    - Run `rustup update` to get the latest version.
+### ⚡ **Dual Execution Modes**
+- **🔧 Transpiler Mode** - Transpiles to optimized C++ code, then compiles to native executable
+- **🚀 Interpreter Mode** - Direct execution for rapid development and testing
 
-2. **Clone the Project**:
+---
+
+## 🚀 Quick Start
+
+### Installation
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/TheJurmikDev/Jurom-language
-   cd Jurom-language
+   git clone https://github.com/TheJurmikDev/Jurom.git
+   cd jurom
    ```
 
-3. **Build Jurom**:
-   ```bash
-   cargo build
-   ```
-
-4. **Run a Program**:
-   Using cargo run
-   ```bash
-   cargo run -- myprogram.jr
-   ```
-   
-   Using builded program
+2. **Build the compiler**
    ```bash
    cargo build --release
-   jurom.exe myprogram.jr
    ```
 
-### 📝 Example Program
-Here’s a sample Jurom program that shows variables, loops, and conditionals:
+### Set up your project
+1. **Create new project**
+   ```bash
+   ./jurom.exe create my_project
+   cd my_project
+   ```
 
-```java
-public class main {
-  function main() {
-    system.console.println("Starting Jurom Program!");
-    num count = 0;
-    while (count < 5) {
-      count = count + 1;
-      system.console.println(count);
+2. **Project structure**
+   ```text
+   my_project/
+   ├── src/
+   │   └── main.jr          # Complete language implementation
+   ├── .gitignore           # Ignore file for github
+   └── config.jurom         # Config of the project
+   ```
+
+3. **Edit main file** 
+   ```java
+    public class my_project {
+        function main() {
+            string greeting = "Hello, Jurom!";
+            println(greeting);
+        
+            num count = 1;
+            while (count < 5) {
+                println(count);
+                count = count + 1;
+            }
+        }
     }
-    if (count == 5) {
-      system.console.println("Reached count of 5!");
-    } else {
-      system.console.println("Something went wrong!");
-    }
-    num value = 10;
-    while (value < 13) {
-      system.console.println(value);
-      value = value + 1;
-    }
-    system.console.println("Program finished!");
-  }
-}
-```
+    ```
 
-**Output**:
-```
-Starting Jurom Program!
-1
-2
-3
-4
-5
-Reached count of 5!
-10
-11
-12
-Program finished!
-```
+4. **Run your project**
+    ```bash
+    ./jurom.exe run
+    ```
 
-Save this as `main.jr` and run it.
+## 🎯 Language Capabilities
 
-## ⚙️ How It Works
-- 🧩 **Parser**: Reads `.jr` files and turns code into a structure the compiler understands.
-- 🏃 **Runtime**: Executes your program, handling variables, loops, and conditionals.
-- 🛠️ **Rust Backend**: Built with Rust for fast and reliable performance.
-- 📜 **Syntax**: Designed to be familiar to Java users, but simpler for beginners.
+### ✅ **Currently Supported**
+- [x] **Class Declarations** with `public class ClassName`
+- [x] **Function Definitions** with `function functionName()`
+- [x] **Variable Declarations** with `num` and `string` types
+- [x] **Assignments** with `=` operator
+- [x] **Arithmetic Operations** (`+`, `-`, `*`, `/`)
+- [x] **Comparison Operations** (`==`, `<`, `>`, `!=`, `>=`, `<=`, `&&`, `||`)
+- [x] **Conditional Statements** (`if/else`)
+- [x] **Loops** (`while`)
+- [x] **Method Calls** with dot notation
+- [x] **Console Output** via `println()`
+- [x] **String Literals** with double quotes
+- [x] **Numeric Literals** (integers)
+- [x] **Binary Expressions** with proper precedence
+- [x] **Variable References** in expressions
 
-## 📈 Current Progress
-Jurom is growing! 🌱 Here’s what’s working:
-- Classes, functions, and variable declarations.
-- Arithmetic and comparison operators.
-- `if`, `else if`, `else`, and `while` statements.
-- Console printing with `system.console.println`.
+### 🔀 **Interpretation Process**
+1. **Lexical Analysis** – Source code → Tokens
+2. **Parsing** – Tokens → Abstract Syntax Tree (AST)
+3. **Semantic Analysis** – Checking correctness of syntax and types
+4. **Interpretation** – AST → Executing code at runtime
 
-## 📘 Notes and information
-This project has been started since 2025-05-01.
-- `skidding` is not good for reputation.
-- if you ever find same code, look for date of creation.
+### 🔄 **Transpilation Process**
+1. **Lexical Analysis** - Source code → Tokens
+2. **Parsing** - Tokens → Abstract Syntax Tree (AST)
+3. **Semantic Analysis** – Checking correctness of syntax and types
+4. **Code Generation** - AST → Optimized C++ code
+5. **Native Compilation** - C++ code → Platform-specific executable
 
-Every Jurom program needs few things.
-- `public class` that’s on the start of file.
-- `function main` that’s function under class that’s automatically started.
+### 🎨 **Architecture Highlights**
+- **Rust-Powered** - Memory-safe, fast compilation
+- **Recursive Descent Parser** - Clean, maintainable parsing logic
+- **AST-Based** - Structured intermediate representation
+- **Modular Design** - Separate lexer, parser, interpreter, and code generator
 
-## 🔮 TODO List
-We’re working on making Jurom even better! Here’s what’s planned:
-- 🐛 Fix `if` statements inside `while` loops (currently not working as expected).
-- ➕ Add new operators like modulo (`%`) and power (`**`).
-- ⌨️ Support reading user input from the console.
-- 📋 Add arrays or lists for storing multiple values.
-- 🛞 Add break function for while loops.
-- 💎 Add `break` function for while loop.
-- 💬 Include comments (e.g., `//` for single-line comments).
-- 📢 Improve error messages to be clearer and more helpful.
-- ⚡ Optimize the compiler for faster program execution.
+## 📈 Performance
 
-### 😎 Made By TheJurmik | Visit offical site https://thejurmik.dev
+Jurom's interpret mode runs code interactively via a Rust based runtime:
+- **Low Overhead**: Efficient AST evaluation in Rust.
+- **Memory Efficient**: Variables in `HashMap` with Rust's stack based locals.
+- **Fast Execution**: Leverages Rust's speed for responsive performance.
+
+Jurom's compiler mode generates optimized C++ code with:
+- **Zero Runtime Overhead** - Direct C++ compilation
+- **Memory Efficiency** - Stack-allocated variables
+- **Native Speed** - Full compiler optimizations (-O3)
+
+## 🛣️ Roadmap
+
+### 🎯 **Planned Features**
+- [ ] **Arrays and Collections**
+- [ ] **File I/O Operations**
+- [ ] **Function Parameters**
+- [ ] **Return Values**
+- [ ] **String Interpolation**
+- [ ] **Error Handling**
+- [ ] **Module System**
+- [ ] **Standard Library Expansion**
+
+## 📄 License
+
+This project is open source and available under the [GNU License](LICENSE).
+
+---
+
+**Made with ❤️ for developers who appreciate clean, fast languages.**
+
+*Jurom - Where simplicity meets performance.*

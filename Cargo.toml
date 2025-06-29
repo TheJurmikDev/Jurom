@@ -1,15 +1,7 @@
 [package]
-name = "jurom"
-version = "0.1.4"
-edition = "2024"
-authors = ["TheJurmikDev thejurmik@gmail.com"]
-description = "Rust based programming language named jurom"
-license = "Apache-2.0"
-repository = "https://github.com/TheJurmikDev/Jurom-language"
-readme = "readme.md"
-keywords = ["programming-language", "language", "rust", "jurom", "custom-language"]
-categories = ["compilers", "development-tools"]
+name = "Jurom"
+version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-nom = "7.1.3"
-colored = "3.0.0"
+inkwell = { version = "0.6.0", features = ["llvm15-0"] }

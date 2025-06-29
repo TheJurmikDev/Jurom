@@ -1,0 +1,79 @@
+class hello {
+    function main() {
+        num a = 10;
+        num b = 5;
+        num c = 10;
+
+        println("=== Testing comparison operators ===");
+
+        if (a != b) {
+            println("a is not equal to b");
+        }
+
+        if (a != c) {
+            println("a is not equal to c");
+        } else {
+            println("a is equal to c");
+        }
+
+        if (a >= b) {
+            println("a is greater than or equal to b");
+        }
+
+        if (a >= c) {
+            println("a is greater than or equal to c");
+        }
+
+        if (b <= a) {
+            println("b is less than or equal to a");
+        }
+
+        if (c <= a) {
+            println("c is less than or equal to a");
+        }
+
+        println("=== Testing logical operators ===");
+
+        if (a > b && c == a) {
+            println("a is greater than b AND c is equal to a");
+        }
+
+        if (a > 20 && b > 0) {
+            println("This will not be printed");
+        } else {
+            println("a is not greater than 20 or b is not greater than 0");
+        }
+
+        if (a > 20 || b > 0) {
+            println("a is greater than 20 OR b is greater than 0");
+        }
+
+        if (a < 0 || b < 0) {
+            println("This will not be printed");
+        } else {
+            println("neither a nor b are negative");
+        }
+
+        println("=== Combination of operators ===");
+
+        if ((a >= 10 && b <= 5) || c != 15) {
+            println("Complex condition is true");
+        }
+
+        num counter = 0;
+        while (counter <= 3 && counter >= 0) {
+            println(counter);
+            counter = counter + 1;
+        }
+
+        println("=== Testing in while loop ===");
+
+        num x = 1;
+        while (x <= 5) {
+            if (x != 3) {
+                println(x);
+            }
+            x = x + 1;
+        }
+    }
+}

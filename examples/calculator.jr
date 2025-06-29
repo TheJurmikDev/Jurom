@@ -1,0 +1,35 @@
+public class Calculator {
+    function main() {
+        num a = 20;
+        num b = 5;
+        string operation = "Basic Calculator Results";
+
+        println(operation);
+        println("Number a: ");
+        println(a);
+        println("Number b: ");
+        println(b);
+
+        num sum = a + b;
+        println("Sum (a + b): ");
+        println(sum);
+
+        num difference = a - b;
+        println("Difference (a - b): ");
+        println(difference);
+
+        num product = a * b;
+        println("Product (a * b): ");
+        println(product);
+
+        num quotient = a / b;
+        println("Quotient (a / b): ");
+        println(quotient);
+
+        if (a > b) {
+            println("a is greater than b");
+        } else {
+            println("a is not greater than b");
+        }
+    }
+}
