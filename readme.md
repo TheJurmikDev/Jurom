@@ -101,7 +101,7 @@ Jurom is a clean, Java / Python inspired programming language designed for simpl
 3. **Semantic Analysis** – Checking correctness of syntax and types
 4. **Code Generation** - AST → Optimized C++ code
 5. **Native Compilation** - C++ code → Platform-specific executable
-6. 
+
 ### ⏩ **Compilation Process**
 1. **Lexical Analysis** - Source code → Tokens
 2. **Parsing** - Tokens → Abstract Syntax Tree (AST)
